@@ -3,6 +3,8 @@
 
 @Ashtf 2025
 
+![IMG20250114202659](https://github.com/user-attachments/assets/c39189e0-8c66-448f-a0ef-99eec2af6684)
+
 [Project Summary]
   
   This project is a PDA powered by an ESP32-S3 running a custom "OS" written in C++ using the Arduino IDE. This project utilizes an E-Ink and OLED screen in tandem to mitigate the refresh rate restrictions of an E-Ink panel while retaining the aesthetics and benefits of using E-Ink. This project is a work in progress and currently amounts to a simple GUI for navagating between apps, a text (.txt) file editor, and a basic file manager. More applications are planned for the future and a list of TO-DOs can be found below.
