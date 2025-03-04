@@ -32,6 +32,7 @@
 
 # License
 All files are distrubuted under GNU GPLv3 license:
+
 EInkPDA - A small note-taking and productivity device using E-Ink and OLED.
 Copyright (C) 2025 Ashtf
 
