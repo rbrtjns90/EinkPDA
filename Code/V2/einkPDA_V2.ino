@@ -1,5 +1,5 @@
+// EInk PDA V2.0
 // @Ashtf 2025
-// https://patorjk.com/software/taag/#p=display&v=0&f=Roman&t=Type%20Something%20
 
 //   .oooooo..o oooooooooooo ooooooooooooo ooooo     ooo ooooooooo.    //
 //  d8P'    `Y8 `888'     `8 8'   888   `8 `888'     `8' `888   `Y88.  //
@@ -15,12 +15,26 @@
 #include  <U8g2lib.h>
 #include  <Wire.h>
 #include  <Adafruit_TCA8418.h>
+#include  <vector>
+#include  "RTClib.h"
 #include  "freertos/FreeRTOS.h"
 #include  "freertos/task.h"
-#include  "mpr121.h"
+//#include  "mpr121.h"
 #include  "assets.h"
 #include  "FS.h"
 #include  "SPIFFS.h"
+
+// CONFIGURATION & SETTINGS
+////////////////////////////////////////////////////////////////////////////////////////////////|
+#define   KB_COOLDOWN                  50  // Keypress cooldown
+#define   FULL_REFRESH_AFTER           20  // Perform a full refresh after __ chars
+#define   MAX_FILES                    10  // Number of files to store
+#define   TIMEOUT                     300  // Time until automatic sleep (Seconds)
+#define   FORMAT_SPIFFS_IF_FAILED    true  // Format the SPIFFS filesystem if mount fails
+#define   DEBUG_VERBOSE              true  // Spit out some extra information
+const     String SLEEPMODE =       "TEXT"; // TEXT, SPLASH, CLOCK
+#define   TXT_APP_STYLE                 0  // 0: Old style (NOT RECOMMENDED), 1: New Style
+////////////////////////////////////////////////////////////////////////////////////////////////|
 
 // FONTS
 #include  <Fonts/FreeMonoBold9pt7b.h>
@@ -28,23 +42,18 @@
 // PIN DEFINITION
 #define   I2C_SCL         35
 #define   I2C_SDA         36
-#define   KB_IRQ           8
-#define   PWR_BTN         38
-#define   MAG_SENS         3
-#define   BAT_SENS         6
 #define   MPR121_ADDR   0x5A
 
-// CONFIGURATION & SETTINGS
-#define   KB_COOLDOWN                  50  // Keypress cooldown
-#define   FULL_REFRESH_AFTER           20  // Perform a full refresh after __ chars
-#define   MAX_FILES                    10  // Number of files to store
-#define   TIMEOUT                      15  // Time until automatic sleep (Seconds)
-#define   FORMAT_SPIFFS_IF_FAILED    true  // Format the SPIFFS filesystem if mount fails
-const     String SLEEPMODE =       "TEXT"; // TEXT, SPLASH, CALENDAR
+#define   KB_IRQ           8
+#define   PWR_BTN         38
+#define   BAT_SENS         6
+#define   CHRG_SENS       39
+#define   RTC_INT          1
 
 // DISPLAY AND KEYBOARD SETUP
 GxEPD2_BW<GxEPD2_310_GDEQ031T10, GxEPD2_310_GDEQ031T10::HEIGHT> display(GxEPD2_310_GDEQ031T10(/*CS=*/ 2, /*DC=*/ 21, /*RST=*/ 16, /*BUSY=*/ 37)); 
-U8G2_SH1106_128X32_VISIONOX_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE); 
+U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+
 Adafruit_TCA8418 keypad;
 
 char keysArray[4][10] = {
@@ -70,25 +79,40 @@ char keysArrayFN[4][10] = {
 
 // TOUCH SLIDER SETUP
 bool touchStates[12];
+const char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+// RTC SETUP
+RTC_PCF8563 rtc;
 
 // VARIABLES
-String          currentWord     = "";
-String          allText         = "";
-String          prevAllText     = "";
-String          prevLastLine    = "";
-
+// GENERAL
 volatile int    einkRefresh     = FULL_REFRESH_AFTER;
 int             OLEDFPSMillis   = 0;
 int             KBBounceMillis  = 0;
 volatile int    timeoutMillis   = 0;
 volatile int    prevTimeMillis  = 0;
 volatile bool   TCA8418_event   = false;
+volatile bool   PWR_BTN_event   = false;
 volatile bool   SHFT            = false;
 volatile bool   FN              = false;
 volatile bool   newState        = true;
-bool            prevBKSP        = false;
 bool            noTimeout       = false;
+volatile bool   OLEDPowerSave   = false;
+volatile bool   disableTimeout  = false;
+unsigned int    flashMillis     = 0;
+int             prevTime        = 0;
+uint8_t         prevSec         = 0;
+TaskHandle_t einkHandlerTaskHandle = NULL;
+char currentKB[4][10];
+enum KBState {NORMAL, SHIFT, FUNC};
+KBState CurrentKBState = NORMAL;
 
+// <TXT.ino>
+String          currentWord     = "";
+String          allText         = "";
+String          prevAllText     = "";
+String          prevLastLine    = "";
+bool            prevBKSP        = false;
 int             scroll          = 0;
 int             lines           = 0;
 String          outLines[13];
@@ -99,12 +123,15 @@ String          editingFile     = "";
 String          prevEditingFile = "";
 String          excludedFiles[] = {"/temp.txt", "/settings.txt"};
 
-TaskHandle_t einkHandlerTaskHandle = NULL;
-
-char currentKB[4][10];
-
-enum KBState {NORMAL, SHIFT, FUNC};
-KBState CurrentKBState = NORMAL;
+String          currentLine     = "";
+GFXfont*        currentFont     = (GFXfont*)&FreeMonoBold9pt7b;
+uint8_t         maxCharsPerLine = 0;
+uint8_t         maxLines        = 0;
+uint8_t         fontHeight      = 0;
+uint8_t         lineSpacing     = 2;  // LINE SPACING IN PIXELS
+volatile bool   newLineAdded    = false;
+volatile bool   doFull          = false;
+std::vector<String> allLines;
 
 //        .o.       ooooooooo.   ooooooooo.    .oooooo..o  //
 //       .888.      `888   `Y88. `888   `Y88. d8P'    `Y8  //  
@@ -119,6 +146,11 @@ enum AppState                     {HOME   , TXT   , FILEWIZ   , USB   , BT  , SE
 const String appStateNames[] =    {"HOME" , "TXT" , "FILEWIZ" , "USB" , "BT", "SETTINGS", "DEBUG" };
 const unsigned char* appIcons[] = {_homeIcons2,_homeIcons3,_homeIcons4,_homeIcons5,_homeIcons6};
 
+// SET BOOT APP (HOME)
+AppState CurrentAppState = HOME;
+enum HOMEState {HOME_HOME, NOWLATER};
+HOMEState CurrentHOMEState = HOME_HOME;
+
 // ADD E-INK HANDLER APP SCRIPTS HERE
 void applicationEinkHandler() {
   switch (CurrentAppState) {
@@ -126,7 +158,13 @@ void applicationEinkHandler() {
       einkHandler_HOME();
       break;
     case TXT:
-      einkHandler_TXT();
+      switch (TXT_APP_STYLE) {
+        case 0:
+          einkHandler_TXT();
+          break;
+        case 1:
+          break;
+      }
       break;
     case FILEWIZ:
       einkHandler_FILEWIZ();
@@ -148,7 +186,14 @@ void processKB() {
       processKB_HOME();
       break;
     case TXT:
-      processKB_TXT();
+      switch (TXT_APP_STYLE) {
+        case 0:
+          processKB_TXT();
+          break;
+        case 1:
+          processKB_TXT_NEW();
+          break;
+      }
       break;
     case FILEWIZ:
       processKB_FILEWIZ();
@@ -170,6 +215,35 @@ void processKB() {
 //   8    Y     888   .8'     `888.   888   8       `888   //
 //  o8o        o888o o88o     o8888o o888o o8o        `8   //
 
+// FUNCTION PROTOTYPES
+// <sysFunc.ino>
+// SYSTEM
+void    checkTimeout();
+void    TCA8418_irq();
+char    updateKeypress();
+void    printDebug();
+// SPIFFS
+void    listDir(fs::FS &fs, const char *dirname);
+void    readFile(fs::FS &fs, const char *path);
+String  readFileToString(fs::FS &fs, const char *path);
+void    writeFile(fs::FS &fs, const char *path, const char *message);
+void    appendFile(fs::FS &fs, const char *path, const char *message);
+void    renameFile(fs::FS &fs, const char *path1, const char *path2);
+void    deleteFile(fs::FS &fs, const char *path);
+
+// <OLEDFunc.ino>
+void    oledWord(String word);
+
+// <einkFunc.ino>
+void    refresh();
+void    einkHandler(void *parameter);
+void    statusBar(String input, bool fullWindow = false);
+void    einkTextPartial(String text, bool noRefresh = false);
+void    drawThickLine(int x0, int y0, int x1, int y1, int thickness);
+int     countLines(String input, size_t maxLineLength = 29);
+void einkTextDynamic(bool doFull_, bool noRefresh = false);
+
+// SETUP
 void setup() {
   Serial.begin(115200);
   Wire.begin(I2C_SDA, I2C_SCL);
@@ -192,7 +266,10 @@ void setup() {
   // mpr121_setup();
 
   // POWER SETUP
-  pinMode(PWR_BTN, INPUT);
+  pinMode(PWR_BTN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(PWR_BTN), PWR_BTN_irq, FALLING);
+  pinMode(CHRG_SENS, INPUT);
+
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_8, 0);
 
   // OLED SETUP
@@ -219,10 +296,24 @@ void setup() {
     delay(1000);
   }
 
-  AppState CurrentAppState = HOME;
+  // RTC SETUP
+  pinMode(RTC_INT, INPUT);
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+    oledWord("RTC Failed");
+    delay(1000);
+  }
+  if (rtc.lostPower()) {
+    Serial.println("RTC is NOT initialized");
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  }
+  rtc.start();
 }
 
 void loop() {
-  if (!noTimeout) checkTimeout();
+  if (!noTimeout)  checkTimeout();
+  if (DEBUG_VERBOSE) printDebug();
+
   processKB();
 }

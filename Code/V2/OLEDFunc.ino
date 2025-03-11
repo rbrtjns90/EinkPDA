@@ -59,3 +59,30 @@ void oledWord(String word) {
   }
   
 }
+
+void oledLine(String line, uint8_t maxLength = 12) {
+  u8g2.clearBuffer();
+
+  // DRAW LINE
+  u8g2.setFont(u8g2_font_ncenB18_tr);
+  u8g2.drawStr(120-u8g2.getStrWidth(line.c_str()),16+9,line.c_str());
+  
+  //PROGRESS BAR
+  uint8_t progress = map(line.length(), 0, maxLength, 0, 128);
+  if (line.length() > 0) {
+    u8g2.drawVLine(127, 0, 2);
+    u8g2.drawVLine(0, 0, 2);
+  }
+  u8g2.drawHLine(0,0,progress);
+  u8g2.drawHLine(0,1,progress);
+
+  if (line.length() > (maxLength - 2)) {   
+    if ((millis() / 400) % 2 == 0) {  // ON for 200ms, OFF for 200ms
+      u8g2.drawVLine(127, 8, 32-16);
+      u8g2.drawLine(127,15,124,12);
+      u8g2.drawLine(127,15,124,18);
+    }
+  }
+  
+  u8g2.sendBuffer();
+}

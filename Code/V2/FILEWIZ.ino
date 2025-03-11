@@ -7,6 +7,13 @@
 //  o888o        o888o o888ooooood8 o888ooooood8       `8'      `8'       o888o .8888888888P   //
 
 void processKB_FILEWIZ() {
+  if (OLEDPowerSave) {
+    u8g2.setPowerSave(0);
+    OLEDPowerSave = false;
+  }
+  
+  disableTimeout = false;
+
   CurrentKBState = FUNC;
   int currentMillis = millis();
   //Make sure oled only updates at 60fps
