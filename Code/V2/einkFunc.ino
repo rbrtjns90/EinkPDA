@@ -49,6 +49,27 @@ void statusBar(String input, bool fullWindow) {
   display.drawRect(display.width()-30,display.height()-20,30,20,GxEPD_BLACK);
 }
 
+void drawStatusBar(String input) {
+  display.fillRect(0,display.height()-26,display.width(),26,GxEPD_WHITE);
+  display.drawRect(0,display.height()-20,display.width(),20,GxEPD_BLACK);
+  display.setCursor(4, display.height()-6);
+  display.print(input);
+
+  switch (CurrentKBState) {
+    case NORMAL:
+      //Display battery level
+      display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[6], 30, 20, GxEPD_BLACK);
+      break;
+    case SHIFT:
+      display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[0], 30, 20, GxEPD_BLACK);
+      break;
+    case FUNC:
+      display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[1], 30, 20, GxEPD_BLACK);
+      break;
+  }
+  display.drawRect(display.width()-30,display.height()-20,30,20,GxEPD_BLACK);
+}
+
 void setTXTFont(const GFXfont* font) {
   // SET THE FONT
   display.setFont(font);
@@ -57,6 +78,11 @@ void setTXTFont(const GFXfont* font) {
   // UPDATE maxCharsPerLine & maxLines
   maxCharsPerLine = getMaxCharsPerLine();
   maxLines        = getMaxLines();
+  if (DEBUG_VERBOSE) {
+    Serial.print("char/line: "); Serial.print(maxCharsPerLine);
+    Serial.print("lines: "); Serial.print(maxLines);
+    Serial.println(); 
+  }
 }
 
 uint8_t getMaxCharsPerLine() {
@@ -64,7 +90,7 @@ uint8_t getMaxCharsPerLine() {
   uint16_t charWidth, charHeight;
   display.getTextBounds("W", 0, 0, &x1, &y1, &charWidth, &charHeight);
   
-  return (display.width() / charWidth);
+  return (display.width() / (charWidth+1));
 }
 
 uint8_t getMaxLines() {
@@ -146,6 +172,7 @@ void einkTextDynamic(bool doFull_, bool noRefresh) {
   if (doFull_) {
     for (uint8_t i = size - displayLines; i < displayLines; i++) {
       if ((allLines[i]).length() > 0) {
+        display.setFullWindow();
         display.fillRect(0,(fontHeight+lineSpacing)*i,display.width(),(fontHeight+lineSpacing),GxEPD_WHITE);
         display.setCursor(0, fontHeight+((fontHeight+lineSpacing)*i));
         display.print(allLines[i]);
@@ -163,9 +190,7 @@ void einkTextDynamic(bool doFull_, bool noRefresh) {
     }
   }
 
-  statusBar("L:" + String(allLines.size()) + "," + editingFile);
-
-  if (!noRefresh) refresh();
+  drawStatusBar("L:" + String(allLines.size()) + "," + editingFile);
 }
 
 int countLines(String input, size_t maxLineLength) {

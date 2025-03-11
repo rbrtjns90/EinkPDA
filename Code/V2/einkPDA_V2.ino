@@ -19,7 +19,6 @@
 #include  "RTClib.h"
 #include  "freertos/FreeRTOS.h"
 #include  "freertos/task.h"
-//#include  "mpr121.h"
 #include  "assets.h"
 #include  "FS.h"
 #include  "SPIFFS.h"
@@ -27,13 +26,14 @@
 // CONFIGURATION & SETTINGS
 ////////////////////////////////////////////////////////////////////////////////////////////////|
 #define   KB_COOLDOWN                  50  // Keypress cooldown
-#define   FULL_REFRESH_AFTER           20  // Perform a full refresh after __ chars
+#define   FULL_REFRESH_AFTER            5  // Full refresh after N lines (CHANGE WITH CAUTION)
 #define   MAX_FILES                    10  // Number of files to store
 #define   TIMEOUT                     300  // Time until automatic sleep (Seconds)
 #define   FORMAT_SPIFFS_IF_FAILED    true  // Format the SPIFFS filesystem if mount fails
 #define   DEBUG_VERBOSE              true  // Spit out some extra information
 const     String SLEEPMODE =       "TEXT"; // TEXT, SPLASH, CLOCK
-#define   TXT_APP_STYLE                 0  // 0: Old style (NOT RECOMMENDED), 1: New Style
+#define   TXT_APP_STYLE                 1  // 0: Old Style (NOT SUPPORTED), 1: New Style
+#define   SET_CLOCK_ON_UPLOAD        true  // Should system clock be set automatically on code upload?
 ////////////////////////////////////////////////////////////////////////////////////////////////|
 
 // FONTS
@@ -128,8 +128,8 @@ GFXfont*        currentFont     = (GFXfont*)&FreeMonoBold9pt7b;
 uint8_t         maxCharsPerLine = 0;
 uint8_t         maxLines        = 0;
 uint8_t         fontHeight      = 0;
-uint8_t         lineSpacing     = 2;  // LINE SPACING IN PIXELS
-volatile bool   newLineAdded    = false;
+uint8_t         lineSpacing     = 6;  // LINE SPACING IN PIXELS
+volatile bool   newLineAdded    = true;
 volatile bool   doFull          = false;
 std::vector<String> allLines;
 
@@ -163,6 +163,7 @@ void applicationEinkHandler() {
           einkHandler_TXT();
           break;
         case 1:
+          einkHandler_TXT_NEW();
           break;
       }
       break;
@@ -298,16 +299,14 @@ void setup() {
 
   // RTC SETUP
   pinMode(RTC_INT, INPUT);
-  if (! rtc.begin()) {
+  if (!rtc.begin()) {
     Serial.println("Couldn't find RTC");
     Serial.flush();
     oledWord("RTC Failed");
     delay(1000);
   }
-  if (rtc.lostPower()) {
-    Serial.println("RTC is NOT initialized");
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  }
+  // SET CLOCK IF NEEDED
+  if (SET_CLOCK_ON_UPLOAD || rtc.lostPower()) rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   rtc.start();
 }
 

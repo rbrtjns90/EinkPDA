@@ -114,7 +114,7 @@ void processKB_TXT() {
         else {
           currentWord += inchar;
           if (inchar >= 48 && inchar <= 57) {}  //Only leave FN on if typing numbers
-          else {
+          else if (CurrentKBState != NORMAL){
             CurrentKBState = NORMAL;
             newState = true;
           }
@@ -298,7 +298,10 @@ void processKB_TXT() {
           //Only allow char to be added if it's an allowed char
           if (isalnum(inchar) || inchar == '_' || inchar == '-' || inchar == '.') currentWord += inchar;
           if (inchar >= 48 && inchar <= 57) {}  //Only leave FN on if typing numbers
-          else {CurrentKBState = NORMAL; newState = true;}
+          else if (CurrentKBState != NORMAL){
+            CurrentKBState = NORMAL;
+            newState = true;
+          }
         }
 
         currentMillis = millis();
@@ -359,7 +362,10 @@ void processKB_TXT() {
           //Only allow char to be added if it's an allowed char
           if (isalnum(inchar) || inchar == '_' || inchar == '-' || inchar == '.') currentWord += inchar;
           if (inchar >= 48 && inchar <= 57) {}  //Only leave FN on if typing numbers
-          else {CurrentKBState = NORMAL; newState = true;}
+          else if (CurrentKBState != NORMAL){
+            CurrentKBState = NORMAL;
+            newState = true;
+          }
         }
 
         currentMillis = millis();
@@ -521,6 +527,7 @@ void processKB_TXT_NEW() {
           currentLine = "";
           oledWord("Clearing...");
           doFull = true;
+          newState = true;
           delay(300);
         }
         // LEFT
@@ -541,12 +548,7 @@ void processKB_TXT_NEW() {
         else if (inchar == 6) {
           //File exists, save normally
           if (editingFile != "" && editingFile != "-") {
-            keypad.disableInterrupts();
-            oledWord("Saving File");
-            writeFile(SPIFFS, editingFile.c_str(), allText.c_str());
-            oledWord("Saved");
-            delay(200);
-            keypad.enableInterrupts();
+            saveFile();
             CurrentKBState = NORMAL;
             newState = true;
           }
@@ -556,6 +558,7 @@ void processKB_TXT_NEW() {
             currentLine = "";
             CurrentKBState = NORMAL;
             doFull = true;
+            newState = true;
           }
         }
         //LOAD Recieved
@@ -577,7 +580,7 @@ void processKB_TXT_NEW() {
         else {
           currentLine += inchar;
           if (inchar >= 48 && inchar <= 57) {}  //Only leave FN on if typing numbers
-          else {
+          else if (CurrentKBState != NORMAL) {
             CurrentKBState = NORMAL;
             newState = true;
           }
@@ -770,7 +773,10 @@ void processKB_TXT_NEW() {
           //Only allow char to be added if it's an allowed char
           if (isalnum(inchar) || inchar == '_' || inchar == '-' || inchar == '.') currentWord += inchar;
           if (inchar >= 48 && inchar <= 57) {}  //Only leave FN on if typing numbers
-          else {CurrentKBState = NORMAL; newState = true;}
+          else if (CurrentKBState != NORMAL){
+            CurrentKBState = NORMAL;
+            newState = true;
+          }
         }
 
         currentMillis = millis();
@@ -831,7 +837,10 @@ void processKB_TXT_NEW() {
           //Only allow char to be added if it's an allowed char
           if (isalnum(inchar) || inchar == '_' || inchar == '-' || inchar == '.') currentWord += inchar;
           if (inchar >= 48 && inchar <= 57) {}  //Only leave FN on if typing numbers
-          else {CurrentKBState = NORMAL; newState = true;}
+          else if (CurrentKBState != NORMAL){
+            CurrentKBState = NORMAL;
+            newState = true;
+          }
         }
 
         currentMillis = millis();
@@ -844,6 +853,110 @@ void processKB_TXT_NEW() {
 
     }
     KBBounceMillis = currentMillis;
+  }
+}
+
+void einkHandler_TXT_NEW() {
+  if (newLineAdded || newState) {
+    switch (CurrentTXTState) {
+      case TXT_:
+        if (newState && doFull) {
+          display.fillScreen(GxEPD_WHITE);
+          refresh();
+        }
+        if (newLineAdded && !newState) {
+          einkTextDynamic(true);
+          refresh();
+        }
+        else if (newState && !newLineAdded) {
+          display.setPartialWindow(0,display.height()-20,display.width(),20);
+          drawStatusBar("L:" + String(allLines.size()) + "," + editingFile);
+          refresh();
+        }
+        
+        //einkTextDynamic(true);
+
+        break;
+      case WIZ0:
+        display.setFullWindow();
+        einkTextDynamic(true, true);      
+        display.setFont(&FreeMonoBold9pt7b);
+        
+        display.fillRect(0,display.height()-26,display.width(),26,GxEPD_WHITE);
+        display.drawRect(0,display.height()-20,display.width(),20,GxEPD_BLACK);
+        display.setCursor(4, display.height()-6);
+        display.print("W:" + String(countWords(allText)) + " C:" + String(countVisibleChars(allText)) + " L:" + String(countLines(allText)));
+        display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[6], 30, 20, GxEPD_BLACK);
+
+        display.fillRect(60,0,200,218,GxEPD_WHITE);
+        display.drawBitmap(60,0,fileWizLiteallArray[0],200,218, GxEPD_BLACK);
+
+        keypad.disableInterrupts();
+        listDir(SPIFFS, "/");
+        keypad.enableInterrupts();
+
+        for (int i = 0; i < MAX_FILES; i++) {
+          display.setCursor(88, 54+(17*i));
+          display.print(filesList[i]);
+        }
+
+        display.nextPage();
+        display.hibernate();
+        CurrentKBState = FUNC;
+        break;
+      case WIZ1:
+        display.setFont(&FreeMonoBold9pt7b);
+        
+        display.fillRect(0,display.height()-26,display.width(),26,GxEPD_WHITE);
+        display.drawRect(0,display.height()-20,display.width(),20,GxEPD_BLACK);
+        display.setCursor(4, display.height()-6);
+        display.print("W:" + String(countWords(allText)) + " C:" + String(countVisibleChars(allText)) + " L:" + String(countLines(allText)));
+        display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[6], 30, 20, GxEPD_BLACK);
+
+        display.fillRect(60,0,200,218,GxEPD_WHITE);
+        display.drawBitmap(60,0,fileWizLiteallArray[1],200,218, GxEPD_BLACK);
+
+        display.nextPage();
+        display.hibernate();
+        CurrentKBState = FUNC;
+        break;
+      case WIZ2:
+        display.setFont(&FreeMonoBold9pt7b);
+        
+        display.fillRect(0,display.height()-26,display.width(),26,GxEPD_WHITE);
+        display.drawRect(0,display.height()-20,display.width(),20,GxEPD_BLACK);
+        display.setCursor(4, display.height()-6);
+        display.print("W:" + String(countWords(allText)) + " C:" + String(countVisibleChars(allText)) + " L:" + String(countLines(allText)));
+        display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[6], 30, 20, GxEPD_BLACK);
+
+        display.fillRect(60,0,200,218,GxEPD_WHITE);
+        display.drawBitmap(60,0,fileWizLiteallArray[2],200,218, GxEPD_BLACK);
+
+        display.nextPage();
+        display.hibernate();
+        CurrentKBState = NORMAL;
+        break;
+      case WIZ3:
+        display.setFullWindow();
+        einkTextDynamic(true, true);      
+        display.setFont(&FreeMonoBold9pt7b);
+        
+        display.fillRect(0,display.height()-26,display.width(),26,GxEPD_WHITE);
+        display.drawRect(0,display.height()-20,display.width(),20,GxEPD_BLACK);
+        display.setCursor(4, display.height()-6);
+        display.print("W:" + String(countWords(allText)) + " C:" + String(countVisibleChars(allText)) + " L:" + String(countLines(allText)));
+        display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[6], 30, 20, GxEPD_BLACK);
+
+        display.fillRect(60,0,200,218,GxEPD_WHITE);
+        display.drawBitmap(60,0,fileWizLiteallArray[3],200,218, GxEPD_BLACK);
+
+        display.nextPage();
+        display.hibernate();
+        CurrentKBState = NORMAL;
+        break;
+    }
+    newState = false;
+    newLineAdded = false;
   }
 }
 

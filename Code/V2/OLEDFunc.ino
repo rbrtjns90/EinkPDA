@@ -60,7 +60,8 @@ void oledWord(String word) {
   
 }
 
-void oledLine(String line, uint8_t maxLength = 12) {
+void oledLine(String line) {
+  uint8_t maxLength = maxCharsPerLine;
   u8g2.clearBuffer();
 
   // DRAW LINE
@@ -76,7 +77,8 @@ void oledLine(String line, uint8_t maxLength = 12) {
   u8g2.drawHLine(0,0,progress);
   u8g2.drawHLine(0,1,progress);
 
-  if (line.length() > (maxLength - 2)) {   
+  // LINE END WARNING INDICATOR
+  if (line.length() > (maxLength - (maxLength / 5))) {   
     if ((millis() / 400) % 2 == 0) {  // ON for 200ms, OFF for 200ms
       u8g2.drawVLine(127, 8, 32-16);
       u8g2.drawLine(127,15,124,12);

@@ -6,6 +6,23 @@
 //  oo     .d8P      888      oo     .d8P      888       888       o  8    Y     888   //
 //  8""88888P'      o888o     8""88888P'      o888o     o888ooooood8 o8o        o888o  //
 
+void saveFile() {
+  switch (TXT_APP_STYLE) {
+    case 0:
+      if (editingFile == "" || editingFile == "-") editingFile = "/temp.txt";
+      keypad.disableInterrupts();
+      oledWord("Saving File");
+      writeFile(SPIFFS, editingFile.c_str(), allText.c_str());
+      oledWord("Saved");
+      delay(200);
+      keypad.enableInterrupts();
+      break;
+    case 1:
+      
+      break;
+  }
+}
+
 void checkTimeout() {
   timeoutMillis = millis();
 
@@ -32,15 +49,7 @@ void checkTimeout() {
         //Only save if alltext has significant content
         if (allText.length() > 10) {
           //No current file, save in temp.txt
-          if (editingFile == "" || editingFile == "-") editingFile = "/temp.txt";
-          //Save to SPIFFS
-          keypad.disableInterrupts();
-          oledWord("Saving File");
-          delay(200);
-          writeFile(SPIFFS, editingFile.c_str(), allText.c_str());
-          oledWord("Saved");
-          delay(200);
-          keypad.enableInterrupts();
+          saveFile();
         }
 
         //Put OLED to sleep
@@ -101,15 +110,7 @@ void checkTimeout() {
     //Only save if alltext has significant content
     if (allText.length() > 10) {
       oledWord("Saving Work");
-      //No current file, save in temp.txt
-      if (editingFile == "" || editingFile == "-") editingFile = "/temp.txt";
-      //Save to SPIFFS
-      keypad.disableInterrupts();
-      delay(200);
-      writeFile(SPIFFS, editingFile.c_str(), allText.c_str());
-      oledWord("Saved");
-      delay(200);
-      keypad.enableInterrupts();
+      saveFile();
     }
     
     if (digitalRead(CHRG_SENS) == HIGH) {
@@ -124,9 +125,9 @@ void checkTimeout() {
       display.fillScreen(GxEPD_WHITE);
       //display.nextPage();
       //display.hibernate();
-      display.display(true);
-      display.hibernate();
-      delay(500);
+      //display.display(true);
+      //display.hibernate();
+      //delay(500);
     }
     else {
       //Put OLED to sleep
@@ -176,6 +177,19 @@ void checkTimeout() {
       esp_deep_sleep_start();
     }
     
+  }
+  else if (PWR_BTN_event && CurrentHOMEState == NOWLATER) {
+    CurrentAppState = HOME;
+    CurrentHOMEState = HOME_HOME;
+    PWR_BTN_event = false;
+    if (OLEDPowerSave) {
+      u8g2.setPowerSave(0);
+      OLEDPowerSave = false;
+    }
+    display.fillScreen(GxEPD_WHITE);
+    refresh();
+    delay(200);
+    newState = true;
   }
 }
 
@@ -238,7 +252,6 @@ void printDebug() {
     float batteryVoltage = analogRead(BAT_SENS) * (3.3 / 4095.0) * 2;
     Serial.print(", BAT: "); Serial.print(batteryVoltage, 2); // Print with 2 decimal places
 
-    
     Serial.print(", SYS_TIME: ");
     Serial.print(now.month(), DEC);
     Serial.print('/');

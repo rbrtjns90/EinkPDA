@@ -32,7 +32,8 @@ void processKB_HOME() {
               CurrentAppState = TXT;
               CurrentKBState  = NORMAL;
               einkRefresh = FULL_REFRESH_AFTER + 1;
-              newState = true;
+              //newState = true;
+              newLineAdded = true;
               break;
             case 2: //FILE WIZARD
               CurrentAppState = FILEWIZ;
