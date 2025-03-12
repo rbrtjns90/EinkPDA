@@ -6,12 +6,125 @@
 //   888     888  `88b    d88'  8    Y     888   888       o  //
 //  o888o   o888o  `Y8bood8P'  o8o        o888o o888ooooood8  //
 
+void commandSelect(String command) {
+  command.toLowerCase();
+
+  if (command == "home") {
+    oledWord("You're home, silly!");
+    delay(1000);
+  } 
+  /////////////////////////////
+  else if (command == "note" || command == "text" || command == "write" || command == "notebook" || command == "notepad" || command == "txt") {
+    CurrentAppState = TXT;
+    CurrentKBState  = NORMAL;
+    newLineAdded = true;
+  }
+  /////////////////////////////
+  else if (command == "file wizard" || command == "wiz" || command == "file wiz" || command == "file") {
+    // OPEN FILE WIZ
+  }
+  /////////////////////////////
+  else if (command == "back up" || command == "export" || command == "transfer" || command == "usb transfer" || command == "usb") {
+    // OPEN USB FILE TRANSFER
+  }
+  /////////////////////////////
+  else if (command == "bluetooth" || command == "bt") {
+    // OPEN BLUETOOTH
+  }
+  /////////////////////////////
+  else if (command == "preferences" || command == "setting" || command == "settings") {
+    // OPEN SETTINGS
+  }
+  /////////////////////////////
+  else if (command == "i farted") {
+    oledWord("That smells");
+    delay(1000);
+  } 
+  else if (command == "poop") {
+    oledWord("Yuck");
+    delay(1000);
+  } 
+  else if (command == "hello") {
+    oledWord("Hey, you!");
+    delay(1000);
+  } 
+  else if (command == "hi") {
+    oledWord("What's up?");
+    delay(1000);
+  } 
+  else if (command == "i love you") {
+    oledWord("luv u 2 <3");
+    delay(1000);
+  } 
+  else if (command == "what can you do") {
+    oledWord("idk man");
+    delay(1000);
+  } 
+  else if (command == "alexa") {
+    oledWord("...");
+    delay(1000);
+  } 
+  else {
+    oledWord("Huh?");
+    delay(1000);
+  }
+}
+
 void processKB_HOME() {
   int currentMillis = millis();
 
   switch (CurrentHOMEState) {
     case HOME_HOME:
-      disableTimeout = false;
+      if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
+        char inchar = updateKeypress();
+        // HANDLE INPUTS
+        //No char recieved
+        if (inchar == 0);   
+        //CR Recieved
+        else if (inchar == 13) {                          
+          commandSelect(currentLine);
+          currentLine = "";
+        }                                      
+        //SHIFT Recieved
+        else if (inchar == 17) {                                  
+          if (CurrentKBState == SHIFT) CurrentKBState = NORMAL;
+          else CurrentKBState = SHIFT;
+        }
+        //FN Recieved
+        else if (inchar == 18) {                                  
+          if (CurrentKBState == FUNC) CurrentKBState = NORMAL;
+          else CurrentKBState = FUNC;
+        }
+        //Space Recieved
+        else if (inchar == 32) {                                  
+          currentLine += " ";
+        }
+        //ESC / CLEAR Recieved
+        else if (inchar == 20) {                                  
+          currentLine = "";
+        }
+        //BKSP Recieved
+        else if (inchar == 8) {                  
+          if (currentLine.length() > 0) {
+            currentLine.remove(currentLine.length() - 1);
+          }
+        }
+        else {
+          currentLine += inchar;
+          if (inchar >= 48 && inchar <= 57) {}  //Only leave FN on if typing numbers
+          else if (CurrentKBState != NORMAL) {
+            CurrentKBState = NORMAL;
+          }
+        }
+
+        currentMillis = millis();
+        //Make sure oled only updates at 60fps
+        if (currentMillis - OLEDFPSMillis >= 16) {
+          OLEDFPSMillis = currentMillis;
+          oledLine(currentLine, false);
+        }
+      }
+      /*disableTimeout = false;
       if (OLEDPowerSave) {
         u8g2.setPowerSave(0);
         OLEDPowerSave = false;
@@ -60,7 +173,7 @@ void processKB_HOME() {
           oledWord(currentWord);
         }
         KBBounceMillis = currentMillis;
-      }
+      }*/
       break;
 
     case NOWLATER:
@@ -78,22 +191,17 @@ void einkHandler_HOME() {
   switch (CurrentHOMEState) {
     case HOME_HOME:
       if (newState) {
-      display.setRotation(3);
-      display.fillScreen(GxEPD_WHITE);
+        display.setRotation(3);
+        display.fillScreen(GxEPD_WHITE);
 
-      for (int i = 0; i < 5; i++) {
-        display.drawBitmap(20 + (60*i), 20, homeIconsAllArray[i], 40, 40, GxEPD_BLACK);
-      }
+        for (int i = 0; i < 5; i++) {
+          display.drawBitmap(20 + (60*i), 20, homeIconsAllArray[i], 40, 40, GxEPD_BLACK);
+        }
 
-      display.fillRect(0,display.height()-26,display.width(),26,GxEPD_WHITE);
-      display.drawRect(0,display.height()-20,display.width(),20,GxEPD_BLACK);
-      display.drawRect(display.width()-30,display.height()-20,30,20,GxEPD_BLACK);
-      display.setFont(&FreeMonoBold9pt7b);
-      display.setCursor(4, display.height()-6);
-      display.print("Press a key 1-5");
+        drawStatusBar(" Type What You Want To Do");
 
-      refresh();
-      newState = false;
+        refresh();
+        newState = false;
       }
       break;
 

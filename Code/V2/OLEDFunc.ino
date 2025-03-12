@@ -60,31 +60,47 @@ void oledWord(String word) {
   
 }
 
-void oledLine(String line) {
+void oledLine(String line, bool doProgressBar) {
   uint8_t maxLength = maxCharsPerLine;
   u8g2.clearBuffer();
 
-  // DRAW LINE
+  // DRAW LINE TEXT
   u8g2.setFont(u8g2_font_ncenB18_tr);
   u8g2.drawStr(120-u8g2.getStrWidth(line.c_str()),16+9,line.c_str());
   
   //PROGRESS BAR
-  uint8_t progress = map(line.length(), 0, maxLength, 0, 128);
-  if (line.length() > 0) {
-    u8g2.drawVLine(127, 0, 2);
-    u8g2.drawVLine(0, 0, 2);
-  }
-  u8g2.drawHLine(0,0,progress);
-  u8g2.drawHLine(0,1,progress);
+  if (doProgressBar) {
+    uint8_t progress = map(line.length(), 0, maxLength, 0, 128);
+    if (line.length() > 0) {
+      u8g2.drawVLine(127, 0, 2);
+      u8g2.drawVLine(0, 0, 2);
+    }
+    u8g2.drawHLine(0,0,progress);
+    u8g2.drawHLine(0,1,progress);
 
-  // LINE END WARNING INDICATOR
-  if (line.length() > (maxLength - (maxLength / 5))) {   
-    if ((millis() / 400) % 2 == 0) {  // ON for 200ms, OFF for 200ms
-      u8g2.drawVLine(127, 8, 32-16);
-      u8g2.drawLine(127,15,124,12);
-      u8g2.drawLine(127,15,124,18);
+    // LINE END WARNING INDICATOR
+    if (line.length() > (maxLength - (maxLength / 5))) {   
+      if ((millis() / 400) % 2 == 0) {  // ON for 200ms, OFF for 200ms
+        u8g2.drawVLine(127, 8, 32-16);
+        u8g2.drawLine(127,15,124,12);
+        u8g2.drawLine(127,15,124,18);
+      }
     }
   }
-  
+
+  // DRAW FN/SHIFT IF NEEDED
+  u8g2.setFont(u8g2_font_u8glib_4_tf);
+
+  switch (CurrentKBState) {
+    case SHIFT:
+      u8g2.drawStr((u8g2.getDisplayWidth() - u8g2.getStrWidth("SHFT")) / 2, u8g2.getDisplayHeight(), "SHIFT");
+      break;
+    case FUNC:
+      u8g2.drawStr((u8g2.getDisplayWidth() - u8g2.getStrWidth("FN")) / 2, u8g2.getDisplayHeight(), "FN");
+      break;
+  }
+
+  u8g2.setFont(u8g2_font_ncenB18_tr);
   u8g2.sendBuffer();
+
 }

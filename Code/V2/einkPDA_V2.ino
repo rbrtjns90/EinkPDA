@@ -72,7 +72,7 @@ char keysArraySHFT[4][10] = {
 
 char keysArrayFN[4][10] = {
   {'1', '2', '3', '4', '5', '6', '7' , '8' , '9', '0'},
-  {'#', '!', '$', ':', ';', '(', ')', '\'', '\"',  8 },     //8:BKSP
+  {'#', '!', '$', ':', ';', '(', ')', '\'', '\"', 12 },     //8:BKSP
   { 9 , '%', '-', '&', '+', '-', '/', '?' , ',' , 13 },     //9:TAB, 13:CR
   { 0 , 17 , 18 , ' ', ' ', ' ',  5 ,  7  ,  6  ,  0 }      //17:SHFT, 18:FN, 5:LOAD, 20:SEL, 6:SAVE, 7:FILE
 };
@@ -223,6 +223,11 @@ void    checkTimeout();
 void    TCA8418_irq();
 char    updateKeypress();
 void    printDebug();
+String  vectorToString();
+void    stringToVector();
+void    saveFile();
+void    loadFile();
+
 // SPIFFS
 void    listDir(fs::FS &fs, const char *dirname);
 void    readFile(fs::FS &fs, const char *path);
@@ -234,6 +239,7 @@ void    deleteFile(fs::FS &fs, const char *path);
 
 // <OLEDFunc.ino>
 void    oledWord(String word);
+void    oledLine(String line, bool doProgressBar = true);
 
 // <einkFunc.ino>
 void    refresh();
@@ -242,7 +248,8 @@ void    statusBar(String input, bool fullWindow = false);
 void    einkTextPartial(String text, bool noRefresh = false);
 void    drawThickLine(int x0, int y0, int x1, int y1, int thickness);
 int     countLines(String input, size_t maxLineLength = 29);
-void einkTextDynamic(bool doFull_, bool noRefresh = false);
+void    einkTextDynamic(bool doFull_, bool noRefresh = false);
+void    setTXTFont(const GFXfont* font);
 
 // SETUP
 void setup() {

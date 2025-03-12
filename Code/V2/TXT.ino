@@ -498,18 +498,22 @@ void processKB_TXT_NEW() {
 
         // HANDLE INPUTS
         //No char recieved
-        if (inchar == 0);                                         
+        if (inchar == 0);  
+        else if (inchar == 12) {
+          CurrentAppState = HOME;
+          currentLine     = "";
+          newState        = true;
+          CurrentKBState  = NORMAL;
+        }                                       
         //SHIFT Recieved
         else if (inchar == 17) {                                  
           if (CurrentKBState == SHIFT) CurrentKBState = NORMAL;
           else CurrentKBState = SHIFT;
-          newState = true;
         }
         //FN Recieved
         else if (inchar == 18) {                                  
           if (CurrentKBState == FUNC) CurrentKBState = NORMAL;
           else CurrentKBState = FUNC;
-          newState = true;
         }
         //Space Recieved
         else if (inchar == 32) {                                  
@@ -527,7 +531,7 @@ void processKB_TXT_NEW() {
           currentLine = "";
           oledWord("Clearing...");
           doFull = true;
-          newState = true;
+          newLineAdded = true;
           delay(300);
         }
         // LEFT
@@ -550,7 +554,7 @@ void processKB_TXT_NEW() {
           if (editingFile != "" && editingFile != "-") {
             saveFile();
             CurrentKBState = NORMAL;
-            newState = true;
+            newLineAdded = true;
           }
           //File does not exist, make a new one
           else {
@@ -562,13 +566,10 @@ void processKB_TXT_NEW() {
           }
         }
         //LOAD Recieved
-        else if (inchar == 5) {                                                         // FIX
-          keypad.disableInterrupts();
-          oledWord("Loading File");
-          allText = readFileToString(SPIFFS, ("/" + editingFile).c_str());
-          keypad.enableInterrupts();
+        else if (inchar == 5) {
+          loadFile();
           CurrentKBState = NORMAL;
-          newState = true;
+          newLineAdded = true;
         }
         //FILE Recieved
         else if (inchar == 7) {
@@ -582,7 +583,6 @@ void processKB_TXT_NEW() {
           if (inchar >= 48 && inchar <= 57) {}  //Only leave FN on if typing numbers
           else if (CurrentKBState != NORMAL) {
             CurrentKBState = NORMAL;
-            newState = true;
           }
         }
 
@@ -608,8 +608,9 @@ void processKB_TXT_NEW() {
         else if (inchar == 127 || inchar == 8) {                  
           CurrentTXTState = TXT_;
           CurrentKBState = NORMAL;
-          einkRefresh = FULL_REFRESH_AFTER + 1;
-          newState = true;
+          newLineAdded = true;
+          currentWord = "";
+          currentLine = "";
           display.fillScreen(GxEPD_WHITE);
         }
         else {
@@ -635,10 +636,11 @@ void processKB_TXT_NEW() {
           }
           //Selected file is current file, return to editor
           else {
-            CurrentTXTState = TXT_;
             CurrentKBState = NORMAL;
-            einkRefresh = FULL_REFRESH_AFTER + 1;
-            newState = true;
+            CurrentTXTState = TXT_;
+            newLineAdded = true;
+            currentWord = "";
+            currentLine = "";
             display.fillScreen(GxEPD_WHITE);
           }
 
@@ -679,20 +681,15 @@ void processKB_TXT_NEW() {
             //File to be saved exists
             else {
               //Save current file
-              keypad.disableInterrupts();
-              oledWord("Saving File");
-              writeFile(SPIFFS, prevEditingFile.c_str(), allText.c_str());
-              oledWord("Saved");
-              delay(200);
+              saveFile();
               //Load new file
-              oledWord("Loading File");
-              allText = readFileToString(SPIFFS, editingFile.c_str());
-              keypad.enableInterrupts();
+              loadFile();
               //Return to TXT
               CurrentTXTState = TXT_;
               CurrentKBState = NORMAL;
-              einkRefresh = FULL_REFRESH_AFTER + 1;
-              newState = true;
+              newLineAdded = true;
+              currentWord = "";
+              currentLine = "";
               display.fillScreen(GxEPD_WHITE);
             }
           }
@@ -700,15 +697,13 @@ void processKB_TXT_NEW() {
           else if (numSelect == 2) {
             Serial.println("NO  (don't save current file)");
             //Just load new file
-            keypad.disableInterrupts();
-            oledWord("Loading File");
-            allText = readFileToString(SPIFFS, ("/" + editingFile).c_str());
-            keypad.enableInterrupts();
+            loadFile();
             //Return to TXT
             CurrentTXTState = TXT_;
             CurrentKBState = NORMAL;
-            einkRefresh = FULL_REFRESH_AFTER + 1;
-            newState = true;
+            newLineAdded = true;
+            currentWord = "";
+            currentLine = "";
             display.fillScreen(GxEPD_WHITE);
           }
         }
@@ -753,20 +748,18 @@ void processKB_TXT_NEW() {
           prevEditingFile = "/" + currentWord + ".txt";
 
           //Save the file
-          keypad.disableInterrupts();
-          oledWord("Saving File");
-          writeFile(SPIFFS, prevEditingFile.c_str(), allText.c_str());
-          oledWord("Saved");
-          delay(200);
+          saveFile();
           //Load new file
+          loadFile();
 
           keypad.enableInterrupts();
 
           //Return to TXT_
           CurrentTXTState = TXT_;
           CurrentKBState = NORMAL;
-          newState = true;
+          newLineAdded = true;
           currentWord = "";
+          currentLine = "";
         }
         //All other chars
         else {
@@ -793,13 +786,11 @@ void processKB_TXT_NEW() {
         else if (inchar == 17) {                                  
           if (CurrentKBState == SHIFT) CurrentKBState = NORMAL;
           else CurrentKBState = SHIFT;
-          newState = true;
         }
         //FN Recieved
         else if (inchar == 18) {                                  
           if (CurrentKBState == FUNC) CurrentKBState = NORMAL;
           else CurrentKBState = FUNC;
-          newState = true;
         }
         //Space Recieved
         else if (inchar == 32) {}
@@ -818,19 +809,15 @@ void processKB_TXT_NEW() {
           editingFile = "/" + currentWord + ".txt";
 
           //Save the file
-          keypad.disableInterrupts();
-          oledWord("Saving " + editingFile);
-          writeFile(SPIFFS, editingFile.c_str(), allText.c_str());
-          oledWord("Saved " + editingFile);
-          delay(200);
-          keypad.enableInterrupts();
+          saveFile();
           //Ask to save prev file
           
           //Return to TXT_
           CurrentTXTState = TXT_;
           CurrentKBState = NORMAL;
-          newState = true;
+          newLineAdded = true;
           currentWord = "";
+          currentLine = "";
         }
         //All other chars
         else {
@@ -868,11 +855,11 @@ void einkHandler_TXT_NEW() {
           einkTextDynamic(true);
           refresh();
         }
-        else if (newState && !newLineAdded) {
+        /*else if (newState && !newLineAdded) {
           display.setPartialWindow(0,display.height()-20,display.width(),20);
           drawStatusBar("L:" + String(allLines.size()) + "," + editingFile);
           refresh();
-        }
+        }*/
         
         //einkTextDynamic(true);
 

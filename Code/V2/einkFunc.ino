@@ -34,7 +34,7 @@ void statusBar(String input, bool fullWindow) {
   display.setCursor(4, display.height()-6);
   display.print(input);
 
-  switch (CurrentKBState) {
+  /*switch (CurrentKBState) {
     case NORMAL:
       //Display battery level
       display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[6], 30, 20, GxEPD_BLACK);
@@ -45,17 +45,18 @@ void statusBar(String input, bool fullWindow) {
     case FUNC:
       display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[1], 30, 20, GxEPD_BLACK);
       break;
-  }
+  }*/
   display.drawRect(display.width()-30,display.height()-20,30,20,GxEPD_BLACK);
 }
 
 void drawStatusBar(String input) {
+  display.setFont(&FreeMonoBold9pt7b);
   display.fillRect(0,display.height()-26,display.width(),26,GxEPD_WHITE);
   display.drawRect(0,display.height()-20,display.width(),20,GxEPD_BLACK);
   display.setCursor(4, display.height()-6);
   display.print(input);
 
-  switch (CurrentKBState) {
+  /*switch (CurrentKBState) {
     case NORMAL:
       //Display battery level
       display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[6], 30, 20, GxEPD_BLACK);
@@ -66,7 +67,7 @@ void drawStatusBar(String input) {
     case FUNC:
       display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[1], 30, 20, GxEPD_BLACK);
       break;
-  }
+  }*/
   display.drawRect(display.width()-30,display.height()-20,30,20,GxEPD_BLACK);
 }
 

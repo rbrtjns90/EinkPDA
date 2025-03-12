@@ -13,13 +13,77 @@ void saveFile() {
       keypad.disableInterrupts();
       oledWord("Saving File");
       writeFile(SPIFFS, editingFile.c_str(), allText.c_str());
-      oledWord("Saved");
+      oledWord("Saved"+editingFile);
       delay(200);
       keypad.enableInterrupts();
       break;
     case 1:
-      
+      String textToSave = vectorToString();
+      if (editingFile == "" || editingFile == "-") editingFile = "/temp.txt";
+      keypad.disableInterrupts();
+      oledWord("Saving File");
+      writeFile(SPIFFS, editingFile.c_str(), textToSave.c_str());
+      oledWord("Saved"+editingFile);
+      delay(200);
+      keypad.enableInterrupts();
       break;
+  }
+}
+
+void loadFile() {
+  switch (TXT_APP_STYLE) {
+    case 0:
+      keypad.disableInterrupts();
+      oledWord("Loading File");
+      allText = readFileToString(SPIFFS, ("/" + editingFile).c_str());
+      keypad.enableInterrupts();
+      break;
+    case 1:
+      keypad.disableInterrupts();
+      oledWord("Loading File");
+      String textToLoad = readFileToString(SPIFFS, ("/" + editingFile).c_str());
+      stringToVector(textToLoad);
+      keypad.enableInterrupts();
+      break;
+  }
+}
+
+String vectorToString() {
+  String result;
+  setTXTFont(currentFont);
+
+  for (size_t i = 0; i < allLines.size(); i++) {
+    result += allLines[i];
+
+    // Add newline only if the line doesn't fully use the available space
+    if (allLines[i].length() < maxCharsPerLine) {
+      result += '\n';
+    }
+  }
+
+  return result;
+}
+
+void stringToVector(String inputText) {
+  allLines.clear();
+  String currentLine;
+
+  for (size_t i = 0; i < inputText.length(); i++) {
+    char c = inputText[i];
+
+    if (c == '\n' || currentLine.length() >= maxCharsPerLine) {
+      allLines.push_back(currentLine);
+      currentLine = "";
+    }
+    
+    if (c != '\n') {
+      currentLine += c;
+    }
+  }
+
+  // PUSH LAST LINE IF IT'S NOT EMPTY
+  if (currentLine.length() > 0) {
+    allLines.push_back(currentLine);
   }
 }
 
@@ -71,7 +135,9 @@ void checkTimeout() {
               prevAllText = allText;
               einkRefresh = FULL_REFRESH_AFTER + 1;
               display.setFullWindow();
-              einkTextPartial(allText, true);      
+              if (TXT_APP_STYLE == 0) einkTextPartial(allText, true);
+              else if (TXT_APP_STYLE == 1) einkTextDynamic(true, true);
+                    
               display.setFont(&FreeMonoBold9pt7b);
               
               display.fillRect(0,display.height()-26,display.width(),26,GxEPD_WHITE);
@@ -149,7 +215,8 @@ void checkTimeout() {
             prevAllText = allText;
             einkRefresh = FULL_REFRESH_AFTER + 1;
             display.setFullWindow();
-            einkTextPartial(allText, true);      
+            if (TXT_APP_STYLE == 0) einkTextPartial(allText, true);
+            else if (TXT_APP_STYLE == 1) einkTextDynamic(true, true);    
             display.setFont(&FreeMonoBold9pt7b);
             
             display.fillRect(0,display.height()-26,display.width(),26,GxEPD_WHITE);
