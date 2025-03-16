@@ -504,7 +504,11 @@ void processKB_TXT_NEW() {
           currentLine     = "";
           newState        = true;
           CurrentKBState  = NORMAL;
-        }                                       
+        }
+        //TAB Recieved
+        else if (inchar == 9) {                                  
+          currentLine += "    ";
+        }                                      
         //SHIFT Recieved
         else if (inchar == 17) {                                  
           if (CurrentKBState == SHIFT) CurrentKBState = NORMAL;
@@ -593,12 +597,25 @@ void processKB_TXT_NEW() {
           oledLine(currentLine);
         }
 
-        if (currentLine.length() >= maxCharsPerLine) {                          
-          allLines.push_back(currentLine);
-          currentLine = "";
-          newLineAdded = true;
-        }
+        // OLD METHOD
+        // if (currentLine.length() >= maxCharsPerLine) {                          
+        //   allLines.push_back(currentLine);
+        //   currentLine = "";
+        //   newLineAdded = true;
+        // }
 
+        // NEW METHOD
+        if (currentLine.length() > 0) {
+          int16_t x1, y1;
+          uint16_t charWidth, charHeight;
+          display.getTextBounds(currentLine, 0, 0, &x1, &y1, &charWidth, &charHeight);
+
+          if (charWidth >= display.width()-5) {
+            allLines.push_back(currentLine);
+            currentLine = "";
+            newLineAdded = true;
+          }
+        }
 
         break;
       case WIZ0:

@@ -56,19 +56,28 @@ void drawStatusBar(String input) {
   display.setCursor(4, display.height()-6);
   display.print(input);
 
-  /*switch (CurrentKBState) {
-    case NORMAL:
-      //Display battery level
-      display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[6], 30, 20, GxEPD_BLACK);
-      break;
-    case SHIFT:
-      display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[0], 30, 20, GxEPD_BLACK);
-      break;
-    case FUNC:
-      display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[1], 30, 20, GxEPD_BLACK);
-      break;
-  }*/
+  // BATTERY INDICATOR
+  display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[battState], 30, 20, GxEPD_BLACK);
   display.drawRect(display.width()-30,display.height()-20,30,20,GxEPD_BLACK);
+
+  // CLOCK
+  if (SYSTEM_CLOCK) {
+    display.setFont(&FreeSans9pt7b);
+    DateTime now = rtc.now();
+    String timeString = "";
+    if (now.hour() < 10) timeString += ("0"+String(now.hour()));
+    else timeString += String(now.hour());
+    //timeString += String(now.hour());
+    timeString += ":";
+    if (now.minute() < 10) timeString += ("0"+String(now.minute()));
+    else timeString += String(now.minute());
+
+    display.fillRect(display.width() - 55,display.height()-26-9-4,55,13,GxEPD_WHITE);
+    display.drawRect(display.width() - 55,display.height()-26-9-4,55,17,GxEPD_BLACK);
+    display.setCursor(display.width() - 53, display.height()-25);
+    display.print(timeString);
+    display.setFont(&FreeMonoBold9pt7b);
+  }
 }
 
 void setTXTFont(const GFXfont* font) {
@@ -80,27 +89,30 @@ void setTXTFont(const GFXfont* font) {
   maxCharsPerLine = getMaxCharsPerLine();
   maxLines        = getMaxLines();
   if (DEBUG_VERBOSE) {
-    Serial.print("char/line: "); Serial.print(maxCharsPerLine);
-    Serial.print("lines: "); Serial.print(maxLines);
-    Serial.println(); 
+    //Serial.print("char/line: "); Serial.print(maxCharsPerLine);
+    //Serial.print("lines: "); Serial.print(maxLines);
+    //Serial.println(); 
   }
 }
 
 uint8_t getMaxCharsPerLine() {
   int16_t x1, y1;
   uint16_t charWidth, charHeight;
-  display.getTextBounds("W", 0, 0, &x1, &y1, &charWidth, &charHeight);
-  
-  return (display.width() / (charWidth+1));
+  // GET AVERAGE CHAR WIDTH
+  display.getTextBounds("abcdefghijklmnopqrstuvwxyz", 0, 0, &x1, &y1, &charWidth, &charHeight);
+  charWidth = charWidth/52;
+
+  return (display.width() / (charWidth));
 }
 
 uint8_t getMaxLines() {
   int16_t x1, y1;
   uint16_t charWidth, charHeight;
-  display.getTextBounds("WHT", 0, 0, &x1, &y1, &charWidth, &charHeight);
+  // GET MAX CHAR HEIGHT
+  display.getTextBounds("H", 0, 0, &x1, &y1, &charWidth, &charHeight);
   fontHeight = charHeight;
   
-  return (display.height() / (charHeight+lineSpacing));
+  return ((display.height()-26) / (charHeight+lineSpacing));
 }
 
 void drawThickLine(int x0, int y0, int x1, int y1, int thickness) {

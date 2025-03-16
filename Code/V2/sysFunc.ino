@@ -5,7 +5,22 @@
 //       `"Y88b     `888'          `"Y88b      888       888    "     8  `888'   888   //
 //  oo     .d8P      888      oo     .d8P      888       888       o  8    Y     888   //
 //  8""88888P'      o888o     8""88888P'      o888o     o888ooooood8 o8o        o888o  //
+void updateBattState() {
+  float batteryVoltage = (analogRead(BAT_SENS) * (3.3 / 4095.0) * 2) + 0.2;
 
+  if (digitalRead(CHRG_SENS) == 1) battState = 7;
+  else if (batteryVoltage >  4.1)  battState = 6;
+  else if (batteryVoltage >  3.9)  battState = 5;
+  else if (batteryVoltage >  3.8)  battState = 4;
+  else if (batteryVoltage >  3.7)  battState = 3;
+  else if (batteryVoltage <= 3.6)  battState = 2;
+  
+
+  if (battState != prevBattState) {
+    prevBattState = battState;
+    newState = true;
+  }
+}
 void saveFile() {
   switch (TXT_APP_STYLE) {
     case 0:
@@ -19,11 +34,14 @@ void saveFile() {
       break;
     case 1:
       String textToSave = vectorToString();
+      Serial.println("Text to save:");
+      Serial.println(textToSave);
       if (editingFile == "" || editingFile == "-") editingFile = "/temp.txt";
       keypad.disableInterrupts();
-      oledWord("Saving File");
-      writeFile(SPIFFS, editingFile.c_str(), textToSave.c_str());
-      oledWord("Saved"+editingFile);
+      if (!editingFile.startsWith("/")) editingFile = "/" + editingFile;
+      oledWord("Saving File: "+ editingFile);
+      writeFile(SPIFFS, (editingFile).c_str(), textToSave.c_str());
+      oledWord("Saved: "+ editingFile);
       delay(200);
       keypad.enableInterrupts();
       break;
@@ -41,7 +59,10 @@ void loadFile() {
     case 1:
       keypad.disableInterrupts();
       oledWord("Loading File");
-      String textToLoad = readFileToString(SPIFFS, ("/" + editingFile).c_str());
+      if (!editingFile.startsWith("/")) editingFile = "/" + editingFile;
+      String textToLoad = readFileToString(SPIFFS, (editingFile).c_str());
+      Serial.println("Text to load:");
+      Serial.println(textToLoad);
       stringToVector(textToLoad);
       keypad.enableInterrupts();
       break;
@@ -55,8 +76,12 @@ String vectorToString() {
   for (size_t i = 0; i < allLines.size(); i++) {
     result += allLines[i];
 
+    int16_t x1, y1;
+    uint16_t charWidth, charHeight;
+    display.getTextBounds(allLines[i], 0, 0, &x1, &y1, &charWidth, &charHeight);
+
     // Add newline only if the line doesn't fully use the available space
-    if (allLines[i].length() < maxCharsPerLine) {
+    if (charWidth < display.width()) {
       result += '\n';
     }
   }
@@ -65,25 +90,30 @@ String vectorToString() {
 }
 
 void stringToVector(String inputText) {
+  setTXTFont(currentFont);
   allLines.clear();
-  String currentLine;
+  String currentLine_;
 
   for (size_t i = 0; i < inputText.length(); i++) {
     char c = inputText[i];
 
-    if (c == '\n' || currentLine.length() >= maxCharsPerLine) {
-      allLines.push_back(currentLine);
-      currentLine = "";
+    int16_t x1, y1;
+    uint16_t charWidth, charHeight;
+    display.getTextBounds(currentLine_, 0, 0, &x1, &y1, &charWidth, &charHeight);
+
+    if (c == '\n' || charWidth >= display.width()-5) {
+      allLines.push_back(currentLine_);
+      currentLine_ = "";
     }
     
     if (c != '\n') {
-      currentLine += c;
+      currentLine_ += c;
     }
   }
 
   // PUSH LAST LINE IF IT'S NOT EMPTY
-  if (currentLine.length() > 0) {
-    allLines.push_back(currentLine);
+  if (currentLine_.length() > 0) {
+    allLines.push_back(currentLine_);
   }
 }
 
@@ -368,12 +398,25 @@ void listDir(fs::FS &fs, const char *dirname) {
   File file = root.openNextFile();
   while (file && fileIndex < MAX_FILES) {
     if (!file.isDirectory()) {
-      filesList[fileIndex++] = String(file.name()); // Store file name
+      String fileName = String(file.name());
+      
+      // Check if file is in the exclusion list
+      bool excluded = false;
+      for (const String &excludedFile : excludedFiles) {
+        if (fileName.equals(excludedFile)) {
+          excluded = true;
+          break;
+        }
+      }
+
+      if (!excluded) {
+        filesList[fileIndex++] = fileName; // Store file name if not excluded
+      }
     }
     file = root.openNextFile();
   }
 
-  for (int i = 0; i < MAX_FILES; i++) {
+  for (int i = 0; i < fileIndex; i++) { // Only print valid entries
     Serial.println(filesList[i]);
   }
 }

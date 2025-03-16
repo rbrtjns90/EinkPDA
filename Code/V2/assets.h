@@ -77,8 +77,6 @@ const unsigned char* KBStatusallArray[8] = {
 	KBStatusKBStatus7
 };
 
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 // 'aero', 320x240px
 const unsigned char backgroundaero [] PROGMEM = {

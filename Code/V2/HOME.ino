@@ -190,7 +190,9 @@ void processKB_HOME() {
 void einkHandler_HOME() {
   switch (CurrentHOMEState) {
     case HOME_HOME:
+      
       if (newState) {
+        newState = false;
         display.setRotation(3);
         display.fillScreen(GxEPD_WHITE);
 
@@ -201,7 +203,6 @@ void einkHandler_HOME() {
         drawStatusBar(" Type What You Want To Do");
 
         refresh();
-        newState = false;
       }
       break;
 
