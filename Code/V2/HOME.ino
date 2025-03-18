@@ -14,25 +14,27 @@ void commandSelect(String command) {
     delay(1000);
   } 
   /////////////////////////////
-  else if (command == "note" || command == "text" || command == "write" || command == "notebook" || command == "notepad" || command == "txt") {
+  else if (command == "note" || command == "text" || command == "write" || command == "notebook" || command == "notepad" || command == "txt" || command == "1") {
     CurrentAppState = TXT;
     CurrentKBState  = NORMAL;
     newLineAdded = true;
   }
   /////////////////////////////
-  else if (command == "file wizard" || command == "wiz" || command == "file wiz" || command == "file") {
-    // OPEN FILE WIZ
+  else if (command == "file wizard" || command == "wiz" || command == "file wiz" || command == "file" || command == "2") {
+    CurrentAppState = FILEWIZ;
+    CurrentKBState  = NORMAL;
+    newState = true;
   }
   /////////////////////////////
-  else if (command == "back up" || command == "export" || command == "transfer" || command == "usb transfer" || command == "usb") {
+  else if (command == "back up" || command == "export" || command == "transfer" || command == "usb transfer" || command == "usb" || command == "3") {
     // OPEN USB FILE TRANSFER
   }
   /////////////////////////////
-  else if (command == "bluetooth" || command == "bt") {
+  else if (command == "bluetooth" || command == "bt" || command == "4") {
     // OPEN BLUETOOTH
   }
   /////////////////////////////
-  else if (command == "preferences" || command == "setting" || command == "settings") {
+  else if (command == "preferences" || command == "setting" || command == "settings" || command == "5") {
     // OPEN SETTINGS
   }
   /////////////////////////////
@@ -190,7 +192,6 @@ void processKB_HOME() {
 void einkHandler_HOME() {
   switch (CurrentHOMEState) {
     case HOME_HOME:
-      
       if (newState) {
         newState = false;
         display.setRotation(3);

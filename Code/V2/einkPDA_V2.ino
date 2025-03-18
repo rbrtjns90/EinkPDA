@@ -161,20 +161,13 @@ std::vector<String> allLines;
 //  o88o     o8888o o888o        o888o        8""88888P'   //
 
 // ADD APPLICATION, NAME, AND ICON TO LISTS
-enum AppState { HOME,
-                TXT,
-                FILEWIZ,
-                USB,
-                BT,
-                SETTINGS,
-                DEBUG };
+enum AppState { HOME,TXT,FILEWIZ,USB,BT,SETTINGS,DEBUG };
 const String appStateNames[] = { "HOME", "TXT", "FILEWIZ", "USB", "BT", "SETTINGS", "DEBUG" };
 const unsigned char *appIcons[] = { _homeIcons2, _homeIcons3, _homeIcons4, _homeIcons5, _homeIcons6 };
 
 // SET BOOT APP (HOME)
 AppState CurrentAppState = HOME;
-enum HOMEState { HOME_HOME,
-                 NOWLATER };
+enum HOMEState { HOME_HOME,NOWLATER };
 HOMEState CurrentHOMEState = HOME_HOME;
 
 // ADD E-INK HANDLER APP SCRIPTS HERE
@@ -252,6 +245,9 @@ String vectorToString();
 void stringToVector();
 void saveFile();
 void loadFile();
+void delFile(String fileName);
+void renFile(String oldFile, String newFile);
+void copyFile(String oldFile, String newFile);
 void updateBattState();
 
 // SPIFFS

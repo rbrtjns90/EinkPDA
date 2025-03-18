@@ -137,7 +137,7 @@ void processKB_TXT() {
           newState = true;
           display.fillScreen(GxEPD_WHITE);
         }
-        else {
+        else if (inchar >= '0' && inchar <= '9') {
           int fileIndex = (inchar == '0') ? 10 : (inchar - '0');
           //Edit a new file
           if (filesList[fileIndex - 1] != editingFile) {

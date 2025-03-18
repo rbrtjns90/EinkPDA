@@ -5,22 +5,7 @@
 //       `"Y88b     `888'          `"Y88b      888       888    "     8  `888'   888   //
 //  oo     .d8P      888      oo     .d8P      888       888       o  8    Y     888   //
 //  8""88888P'      o888o     8""88888P'      o888o     o888ooooood8 o8o        o888o  //
-void updateBattState() {
-  float batteryVoltage = (analogRead(BAT_SENS) * (3.3 / 4095.0) * 2) + 0.2;
 
-  if (digitalRead(CHRG_SENS) == 1) battState = 7;
-  else if (batteryVoltage >  4.1)  battState = 6;
-  else if (batteryVoltage >  3.9)  battState = 5;
-  else if (batteryVoltage >  3.8)  battState = 4;
-  else if (batteryVoltage >  3.7)  battState = 3;
-  else if (batteryVoltage <= 3.6)  battState = 2;
-  
-
-  if (battState != prevBattState) {
-    prevBattState = battState;
-    newState = true;
-  }
-}
 void saveFile() {
   switch (TXT_APP_STYLE) {
     case 0:
@@ -29,7 +14,7 @@ void saveFile() {
       oledWord("Saving File");
       writeFile(SPIFFS, editingFile.c_str(), allText.c_str());
       oledWord("Saved"+editingFile);
-      delay(200);
+      delay(1000);
       keypad.enableInterrupts();
       break;
     case 1:
@@ -42,7 +27,7 @@ void saveFile() {
       oledWord("Saving File: "+ editingFile);
       writeFile(SPIFFS, (editingFile).c_str(), textToSave.c_str());
       oledWord("Saved: "+ editingFile);
-      delay(200);
+      delay(1000);
       keypad.enableInterrupts();
       break;
   }
@@ -67,6 +52,39 @@ void loadFile() {
       keypad.enableInterrupts();
       break;
   }
+}
+
+void delFile(String fileName) {
+  keypad.disableInterrupts();
+  oledWord("Deleting File: "+ fileName);
+  if (!fileName.startsWith("/")) fileName = "/" + fileName;
+  deleteFile(SPIFFS, fileName.c_str());
+  oledWord("Deleted: "+ fileName);
+  delay(1000);
+  keypad.enableInterrupts();
+}
+
+void renFile(String oldFile, String newFile) {
+  keypad.disableInterrupts();
+  oledWord("Renaming "+ oldFile + " to " + newFile);
+  if (!oldFile.startsWith("/")) oldFile = "/" + oldFile;
+  if (!newFile.startsWith("/")) newFile = "/" + newFile;
+  renameFile(SPIFFS, oldFile.c_str(), newFile.c_str());
+  oledWord("Renamed File");
+  delay(1000);
+  keypad.enableInterrupts();
+}
+
+void copyFile(String oldFile, String newFile) {
+  keypad.disableInterrupts();
+  oledWord("Loading File");
+  if (!oldFile.startsWith("/")) oldFile = "/" + oldFile;
+  if (!newFile.startsWith("/")) newFile = "/" + newFile;
+  String textToLoad = readFileToString(SPIFFS, (oldFile).c_str());
+  writeFile(SPIFFS, (newFile).c_str(), textToLoad.c_str());
+  oledWord("Saved: "+ newFile);
+  delay(1000);
+  keypad.enableInterrupts();
 }
 
 String vectorToString() {
@@ -286,6 +304,23 @@ void checkTimeout() {
     display.fillScreen(GxEPD_WHITE);
     refresh();
     delay(200);
+    newState = true;
+  }
+}
+
+void updateBattState() {
+  float batteryVoltage = (analogRead(BAT_SENS) * (3.3 / 4095.0) * 2) + 0.2;
+
+  if (digitalRead(CHRG_SENS) == 1) battState = 7;
+  else if (batteryVoltage >  4.1)  battState = 6;
+  else if (batteryVoltage >  3.9)  battState = 5;
+  else if (batteryVoltage >  3.8)  battState = 4;
+  else if (batteryVoltage >  3.7)  battState = 3;
+  else if (batteryVoltage <= 3.6)  battState = 2;
+  
+
+  if (battState != prevBattState) {
+    prevBattState = battState;
     newState = true;
   }
 }
