@@ -43,6 +43,7 @@ const String SLEEPMODE = "TEXT";      // TEXT, SPLASH, CLOCK
 #include <Fonts/FreeMonoBold9pt7b.h>
 #include <Fonts/FreeSans9pt7b.h>
 #include <Fonts/FreeSerif9pt7b.h>
+#include <Fonts/FreeSerifBold9pt7b.h>
 // 12x7
 #include <Fonts/FreeMono12pt7b.h>
 #include <Fonts/FreeSans12pt7b.h>
@@ -139,7 +140,9 @@ String filesList[MAX_FILES];
 uint8_t fileIndex = 0;
 String editingFile = "";
 String prevEditingFile = "";
-String excludedFiles[] = { "/temp.txt", "/settings.txt" };
+String excludedFiles[] = { "/temp.txt", "/settings.txt", "/tasks.txt" };
+enum TXTState {TXT_, WIZ0, WIZ1, WIZ2, WIZ3};
+TXTState CurrentTXTState = TXT_;
 
 String currentLine = "";
 //GFXfont *currentFont = (GFXfont *)&FreeMonoBold9pt7b;
@@ -162,8 +165,8 @@ std::vector<String> allLines;
 
 // ADD APPLICATION, NAME, AND ICON TO LISTS
 enum AppState { HOME,TXT,FILEWIZ,USB,BT,SETTINGS,DEBUG };
-const String appStateNames[] = { "HOME", "TXT", "FILEWIZ", "USB", "BT", "SETTINGS", "DEBUG" };
-const unsigned char *appIcons[] = { _homeIcons2, _homeIcons3, _homeIcons4, _homeIcons5, _homeIcons6 };
+const String appStateNames[] =    { "txt"      , "filewiz"  , "usb"      , "bt"       , "settings"  , "tasks"};
+const unsigned char *appIcons[] = { _homeIcons2, _homeIcons3, _homeIcons4, _homeIcons5, _homeIcons6 , taskIconTasks0};
 
 // SET BOOT APP (HOME)
 AppState CurrentAppState = HOME;
@@ -249,6 +252,8 @@ void delFile(String fileName);
 void renFile(String oldFile, String newFile);
 void copyFile(String oldFile, String newFile);
 void updateBattState();
+String removeChar(String str, char character);
+void appendToFile(String path, String inText);
 
 // SPIFFS
 void listDir(fs::FS &fs, const char *dirname);
@@ -258,6 +263,9 @@ void writeFile(fs::FS &fs, const char *path, const char *message);
 void appendFile(fs::FS &fs, const char *path, const char *message);
 void renameFile(fs::FS &fs, const char *path1, const char *path2);
 void deleteFile(fs::FS &fs, const char *path);
+
+// <TASKS.ino>
+std::vector<std::vector<String>> tasks;
 
 // <OLEDFunc.ino>
 void oledWord(String word);

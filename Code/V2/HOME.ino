@@ -9,7 +9,52 @@
 void commandSelect(String command) {
   command.toLowerCase();
 
-  if (command == "home") {
+  // OPEN IN FILE WIZARD
+  if (command.startsWith("-")) {
+    command = removeChar(command, ' ');
+    command = removeChar(command, '-');
+    keypad.disableInterrupts();
+    listDir(SPIFFS, "/");
+    keypad.enableInterrupts();
+
+    for (uint8_t i = 0; i < (sizeof(filesList) / sizeof(filesList[0])); i++) {
+      String lowerFileName = filesList[i]; 
+      lowerFileName.toLowerCase();
+      if (command == lowerFileName || (command+".txt") == lowerFileName || ("/"+command+".txt") == lowerFileName) {
+        workingFile = filesList[i];
+        CurrentAppState = FILEWIZ;
+        CurrentFileWizState = WIZ1_;
+        CurrentKBState  = FUNC;
+        newState = true;
+        return;
+      }
+    }
+  }
+
+  // OPEN IN TXT EDITOR
+  if (command.startsWith("/")) {
+    command = removeChar(command, ' ');
+    command = removeChar(command, '/');
+    keypad.disableInterrupts();
+    listDir(SPIFFS, "/");
+    keypad.enableInterrupts();
+
+    for (uint8_t i = 0; i < (sizeof(filesList) / sizeof(filesList[0])); i++) {
+      String lowerFileName = filesList[i]; 
+      lowerFileName.toLowerCase();
+      if (command == lowerFileName || (command+".txt") == lowerFileName || ("/"+command+".txt") == lowerFileName) {
+        editingFile = filesList[i];
+        loadFile();
+        CurrentAppState = TXT;
+        CurrentTXTState = TXT_;
+        CurrentKBState  = NORMAL;
+        newLineAdded = true;
+        return;
+      }
+    }
+  }
+
+  else if (command == "home") {
     oledWord("You're home, silly!");
     delay(1000);
   } 
@@ -196,10 +241,30 @@ void einkHandler_HOME() {
         newState = false;
         display.setRotation(3);
         display.fillScreen(GxEPD_WHITE);
+        
+        int16_t x1, y1;
+        uint16_t charWidth, charHeight;
+        uint8_t appsPerRow = 5; // Number of apps per row
+        uint8_t spacingX = 60;  // Horizontal spacing
+        uint8_t spacingY = 60;  // Vertical spacing
+        uint8_t iconSize = 40;  // Icon width and height
+        uint8_t startX = 20;    // Initial X position
+        uint8_t startY = 20;    // Initial Y position
 
-        for (int i = 0; i < 5; i++) {
-          display.drawBitmap(20 + (60*i), 20, homeIconsAllArray[i], 40, 40, GxEPD_BLACK);
+        display.setFont(&FreeSerif9pt7b);
+        for (int i = 0; i < sizeof(appIcons) / sizeof(appIcons[0]); i++) {
+          int row = i / appsPerRow;
+          int col = i % appsPerRow;
+          
+          int xPos = startX + (spacingX * col);
+          int yPos = startY + (spacingY * row);
+
+          display.drawBitmap(xPos, yPos, appIcons[i], iconSize, iconSize, GxEPD_BLACK);
+          display.getTextBounds(appStateNames[i], 0, 0, &x1, &y1, &charWidth, &charHeight);
+          display.setCursor(xPos + (iconSize / 2) - (charWidth / 2), yPos + iconSize + 13);
+          display.print(appStateNames[i]);
         }
+        display.setFont(&FreeMonoBold9pt7b);
 
         drawStatusBar(" Type What You Want To Do");
 
@@ -248,5 +313,4 @@ void einkHandler_HOME() {
       }
       break;
   }
-  
 }

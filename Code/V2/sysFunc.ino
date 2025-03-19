@@ -87,6 +87,12 @@ void copyFile(String oldFile, String newFile) {
   keypad.enableInterrupts();
 }
 
+void appendToFile(String path, String inText) {
+  keypad.disableInterrupts();
+  appendFile(SPIFFS, path.c_str(), inText.c_str());
+  keypad.enableInterrupts();
+}
+
 String vectorToString() {
   String result;
   setTXTFont(currentFont);
@@ -99,7 +105,7 @@ String vectorToString() {
     display.getTextBounds(allLines[i], 0, 0, &x1, &y1, &charWidth, &charHeight);
 
     // Add newline only if the line doesn't fully use the available space
-    if (charWidth < display.width()) {
+    if (charWidth < display.width() && i < allLines.size() - 1) {
       result += '\n';
     }
   }
@@ -119,7 +125,7 @@ void stringToVector(String inputText) {
     uint16_t charWidth, charHeight;
     display.getTextBounds(currentLine_, 0, 0, &x1, &y1, &charWidth, &charHeight);
 
-    if (c == '\n' || charWidth >= display.width()-5) {
+    if ((c == '\n' || charWidth >= display.width() - 5) && !currentLine_.isEmpty()) {
       allLines.push_back(currentLine_);
       currentLine_ = "";
     }
@@ -130,9 +136,19 @@ void stringToVector(String inputText) {
   }
 
   // PUSH LAST LINE IF IT'S NOT EMPTY
-  if (currentLine_.length() > 0) {
+  if (!currentLine_.isEmpty()) {
     allLines.push_back(currentLine_);
   }
+}
+
+String removeChar(String str, char character) {
+  String result = "";
+  for (size_t i = 0; i < str.length(); i++) {
+    if (str[i] != character) {
+      result += str[i];
+    }
+  }
+  return result;
 }
 
 void checkTimeout() {
@@ -522,7 +538,7 @@ void appendFile(fs::FS &fs, const char *path, const char *message) {
     Serial.println("- failed to open file for appending");
     return;
   }
-  if (file.print(message)) {
+  if (file.println(message)) {
     Serial.println("- message appended");
   } else {
     Serial.println("- append failed");

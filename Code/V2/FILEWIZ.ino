@@ -329,7 +329,7 @@ void einkHandler_FILEWIZ() {
         display.fillScreen(GxEPD_WHITE);
 
         // DRAW APP
-        drawStatusBar("-> " + workingFile);
+        drawStatusBar("- " + workingFile);
         display.drawBitmap(0, 0, fileWizardallArray[1], 320, 218, GxEPD_BLACK);
 
         refresh();

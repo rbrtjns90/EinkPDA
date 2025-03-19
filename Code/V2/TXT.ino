@@ -6,9 +6,6 @@
 //       888        d8'  `888b        888       //
 //      o888o     o888o  o88888o     o888o      //
 
-enum TXTState {TXT_, WIZ0, WIZ1, WIZ2, WIZ3};
-TXTState CurrentTXTState = TXT_;
-
 // OLD MAINS
 void processKB_TXT() {
   if (OLEDPowerSave) {
