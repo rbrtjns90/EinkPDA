@@ -65,7 +65,9 @@ void updateTasksFile() {
 }
 
 void processKB_TASKS() {
+
 }
 
 void einkHandler_TASKS() {
+
 }

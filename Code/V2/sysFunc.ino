@@ -324,7 +324,29 @@ void checkTimeout() {
   }
 }
 
-void updateBattState() {
+void setCpuSpeed(int newFreq) {
+  // Return early if the frequency is already set
+  if (getCpuFrequencyMhz() == newFreq) return;
+
+  int validFreqs[] = {240, 160, 80, 40, 20, 10};
+  bool isValid = false;
+
+  for (int i = 0; i < sizeof(validFreqs) / sizeof(validFreqs[0]); i++) {
+    if (newFreq == validFreqs[i]) {
+      isValid = true;
+      break;
+    }
+  }
+
+  if (isValid) {
+    setCpuFrequencyMhz(newFreq);
+    Serial.print("CPU Speed changed to: ");
+    Serial.print(newFreq);
+    Serial.println(" MHz");
+  } 
+}
+
+/*void updateBattState() {
   float batteryVoltage = (analogRead(BAT_SENS) * (3.3 / 4095.0) * 2) + 0.2;
 
   if (digitalRead(CHRG_SENS) == 1) battState = 7;
@@ -339,6 +361,39 @@ void updateBattState() {
     prevBattState = battState;
     newState = true;
   }
+}*/
+
+void updateBattState() {
+  float batteryVoltage = (analogRead(BAT_SENS) * (3.3 / 4095.0) * 2) + 0.2;
+
+  static float prevVoltage = 0.0;
+  float threshold = 0.05; // Hysteresis threshold (adjustable)
+
+  if (digitalRead(CHRG_SENS) == 1) {
+    battState = 7;
+  } 
+  else if (batteryVoltage > 4.1 || (prevBattState == 6 && batteryVoltage > (4.1 - threshold))) {
+    battState = 6;
+  } 
+  else if (batteryVoltage > 3.9 || (prevBattState == 5 && batteryVoltage > (3.9 - threshold))) {
+    battState = 5;
+  } 
+  else if (batteryVoltage > 3.8 || (prevBattState == 4 && batteryVoltage > (3.8 - threshold))) {
+    battState = 4;
+  } 
+  else if (batteryVoltage > 3.7 || (prevBattState == 3 && batteryVoltage > (3.7 - threshold))) {
+    battState = 3;
+  } 
+  else if (batteryVoltage <= 3.6) {
+    battState = 2;
+  }
+
+  if (battState != prevBattState) {
+    prevBattState = battState;
+    newState = true;
+  }
+
+  prevVoltage = batteryVoltage;
 }
 
 void TCA8418_irq() {
@@ -391,15 +446,21 @@ void printDebug() {
   DateTime now = rtc.now();
   if (now.second() != prevSec) {
     prevSec = now.second();
+
+    // DISPLAY GPIO STATES
     Serial.print("PWR_BTN: "); Serial.print(digitalRead(PWR_BTN));
     Serial.print(", KB_INT: "); Serial.print(digitalRead(KB_IRQ));
     Serial.print(", CHRG: "); Serial.print(digitalRead(CHRG_SENS));
     Serial.print(", RTC_INT: "); Serial.print(digitalRead(RTC_INT));
 
-    // Read and convert battery voltage
-    float batteryVoltage = analogRead(BAT_SENS) * (3.3 / 4095.0) * 2;
+    // READ AND DISPLAY BATTERY VOLTAGE
+    float batteryVoltage = (analogRead(BAT_SENS) * (3.3 / 4095.0) * 2) + 0.2;
     Serial.print(", BAT: "); Serial.print(batteryVoltage, 2); // Print with 2 decimal places
+    
+    // DISPLAY CLOCK SPEED
+    Serial.print(", CPU FRQ: "); Serial.print(getCpuFrequencyMhz(), 1);
 
+    // DISPLAY SYSTEM TIME
     Serial.print(", SYS_TIME: ");
     Serial.print(now.month(), DEC);
     Serial.print('/');

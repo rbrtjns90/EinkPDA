@@ -594,13 +594,6 @@ void processKB_TXT_NEW() {
           oledLine(currentLine);
         }
 
-        // OLD METHOD
-        // if (currentLine.length() >= maxCharsPerLine) {                          
-        //   allLines.push_back(currentLine);
-        //   currentLine = "";
-        //   newLineAdded = true;
-        // }
-
         // NEW METHOD
         if (currentLine.length() > 0) {
           int16_t x1, y1;
