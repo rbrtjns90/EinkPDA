@@ -59,25 +59,6 @@ void drawStatusBar(String input) {
   // BATTERY INDICATOR
   display.drawBitmap(display.width()-30,display.height()-20, KBStatusallArray[battState], 30, 20, GxEPD_BLACK);
   display.drawRect(display.width()-30,display.height()-20,30,20,GxEPD_BLACK);
-
-  // CLOCK
-  if (SYSTEM_CLOCK) {
-    display.setFont(&FreeSans9pt7b);
-    DateTime now = rtc.now();
-    String timeString = "";
-    if (now.hour() < 10) timeString += ("0"+String(now.hour()));
-    else timeString += String(now.hour());
-    //timeString += String(now.hour());
-    timeString += ":";
-    if (now.minute() < 10) timeString += ("0"+String(now.minute()));
-    else timeString += String(now.minute());
-
-    display.fillRect(display.width() - 55,display.height()-26-9-4,55,13,GxEPD_WHITE);
-    display.drawRect(display.width() - 55,display.height()-26-9-4,55,17,GxEPD_BLACK);
-    display.setCursor(display.width() - 53, display.height()-25);
-    display.print(timeString);
-    display.setFont(&FreeMonoBold9pt7b);
-  }
 }
 
 void setTXTFont(const GFXfont* font) {
@@ -226,3 +207,16 @@ int countLines(String input, size_t maxLineLength) {
 
     return lineCounter;
 }
+
+// oooooooooooo ooooooooo.   oooooooooo.   //
+// `888'     `8 `888   `Y88. `888'   `Y8b  //
+//  888          888   .d88'  888      888 //
+//  888oooo8     888ooo88P'   888      888 //
+//  888    "     888          888      888 //
+//  888       o  888          888     d88' //
+// o888ooooood8 o888o        o888bood8P'   //
+
+
+                                        
+                                        
+                                        

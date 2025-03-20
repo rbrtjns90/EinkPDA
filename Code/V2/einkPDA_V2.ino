@@ -16,7 +16,7 @@
 #include <Wire.h>
 #include <Adafruit_TCA8418.h>
 #include <vector>
-//#include <U8g2_for_Adafruit_GFX.h>
+#include "esp_cpu.h"
 #include "RTClib.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -25,18 +25,20 @@
 #include "SPIFFS.h"
 
 // CONFIGURATION & SETTINGS
-////////////////////////////////////////////////////////////////////////////////////////////////|
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////|
 #define KB_COOLDOWN 50                // Keypress cooldown
 #define FULL_REFRESH_AFTER 5          // Full refresh after N lines (CHANGE WITH CAUTION)
 #define MAX_FILES 10                  // Number of files to store
 #define TIMEOUT 300                   // Time until automatic sleep (Seconds)
 #define FORMAT_SPIFFS_IF_FAILED true  // Format the SPIFFS filesystem if mount fails
-#define DEBUG_VERBOSE false           // Spit out some extra information
-const String SLEEPMODE = "TEXT";      // TEXT, SPLASH, CLOCK
+#define DEBUG_VERBOSE true            // Spit out some extra information
+const   String SLEEPMODE = "TEXT";    // TEXT, SPLASH, CLOCK
 #define TXT_APP_STYLE 1               // 0: Old Style (NOT SUPPORTED), 1: New Style
 #define SET_CLOCK_ON_UPLOAD true      // Should system clock be set automatically on code upload?
-#define SYSTEM_CLOCK false            // Enable a small clock on the bottom of the screen.
-////////////////////////////////////////////////////////////////////////////////////////////////|
+#define SYSTEM_CLOCK true             // Enable a small clock on the bottom of the screen.
+#define SHOW_YEAR false               // Show the year on the clock
+#define SAVE_POWER true               // Enable a slower clock speed to save battery with very little cost to performance
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////|
 
 // FONTS
 // 9x7
@@ -254,6 +256,7 @@ void copyFile(String oldFile, String newFile);
 void updateBattState();
 String removeChar(String str, char character);
 void appendToFile(String path, String inText);
+void setCpuSpeed(int newFreq);
 
 // SPIFFS
 void listDir(fs::FS &fs, const char *dirname);
@@ -307,6 +310,10 @@ void setup() {
   pinMode(PWR_BTN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PWR_BTN), PWR_BTN_irq, FALLING);
   pinMode(CHRG_SENS, INPUT);
+  //WiFi.mode(WIFI_OFF);
+  //btStop();
+  if (SAVE_POWER) setCpuFrequencyMhz(40 );
+  else            setCpuFrequencyMhz(240);
 
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_8, 0);
 

@@ -61,10 +61,6 @@ void oledWord(String word) {
 void oledLine(String line, bool doProgressBar) {
   uint8_t maxLength = maxCharsPerLine;
   u8g2.clearBuffer();
-
-  // DRAW LINE TEXT
-  u8g2.setFont(u8g2_font_ncenB18_tr);
-  u8g2.drawStr(120-u8g2.getStrWidth(line.c_str()),16+9,line.c_str());
   
   //PROGRESS BAR
   if (doProgressBar && line.length() > 0) {
@@ -104,7 +100,25 @@ void oledLine(String line, bool doProgressBar) {
       break;
   }
 
-  u8g2.setFont(u8g2_font_ncenB18_tr);
-  u8g2.sendBuffer();
+  // CLOCK
+  if (SYSTEM_CLOCK) {
+    u8g2.setFont(u8g2_font_u8glib_4_tf);
+    DateTime now = rtc.now();
+    String timeString = "";
+    timeString += String(now.hour());
+    timeString += ":";
+    if (now.minute() < 10) timeString += ("0"+String(now.minute()));
+    else timeString += String(now.minute());
+    u8g2.drawStr(0,u8g2.getDisplayHeight(),timeString.c_str());
+    String day3Char = String(daysOfTheWeek[now.dayOfTheWeek()]).substring(0, 3);
+    if (SHOW_YEAR) day3Char += (" "+String(now.month())+"/"+String(now.day())+"/"+String(now.year()).substring(2,4)); 
+    else           day3Char += (" "+String(now.month())+"/"+String(now.day())); 
+    u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getStrWidth(day3Char.c_str()), u8g2.getDisplayHeight(), day3Char.c_str());    
+  }
 
+  // DRAW LINE TEXT
+  u8g2.setFont(u8g2_font_ncenB18_tr);
+  u8g2.drawStr(120-u8g2.getStrWidth(line.c_str()),16+9,line.c_str());
+
+  u8g2.sendBuffer();
 }
