@@ -301,7 +301,8 @@ void checkTimeout() {
           break;
       }
       
-      display.nextPage();
+      forceSlowFullUpdate = true;
+      refresh();
       display.hibernate();
       
       //Sleep the device
@@ -318,6 +319,7 @@ void checkTimeout() {
       OLEDPowerSave = false;
     }
     display.fillScreen(GxEPD_WHITE);
+    forceSlowFullUpdate = true;
     refresh();
     delay(200);
     newState = true;
@@ -345,23 +347,6 @@ void setCpuSpeed(int newFreq) {
     Serial.println(" MHz");
   } 
 }
-
-/*void updateBattState() {
-  float batteryVoltage = (analogRead(BAT_SENS) * (3.3 / 4095.0) * 2) + 0.2;
-
-  if (digitalRead(CHRG_SENS) == 1) battState = 7;
-  else if (batteryVoltage >  4.1)  battState = 6;
-  else if (batteryVoltage >  3.9)  battState = 5;
-  else if (batteryVoltage >  3.8)  battState = 4;
-  else if (batteryVoltage >  3.7)  battState = 3;
-  else if (batteryVoltage <= 3.6)  battState = 2;
-  
-
-  if (battState != prevBattState) {
-    prevBattState = battState;
-    newState = true;
-  }
-}*/
 
 void updateBattState() {
   float batteryVoltage = (analogRead(BAT_SENS) * (3.3 / 4095.0) * 2) + 0.2;
@@ -447,6 +432,10 @@ void printDebug() {
   if (now.second() != prevSec) {
     prevSec = now.second();
 
+    // DIVIDER
+    Serial.print("//////////////////////////////////////_DEBUG_//////////////////////////////////////"); 
+    Serial.println();
+
     // DISPLAY GPIO STATES
     Serial.print("PWR_BTN: "); Serial.print(digitalRead(PWR_BTN));
     Serial.print(", KB_INT: "); Serial.print(digitalRead(KB_IRQ));
@@ -458,10 +447,13 @@ void printDebug() {
     Serial.print(", BAT: "); Serial.print(batteryVoltage, 2); // Print with 2 decimal places
     
     // DISPLAY CLOCK SPEED
-    Serial.print(", CPU FRQ: "); Serial.print(getCpuFrequencyMhz(), 1);
+    Serial.print(", CPU_FRQ: "); Serial.print(getCpuFrequencyMhz(), 1);
+
+    // FAST FULL UPDATE MODE
+    Serial.print(", FFU: "); Serial.println(GxEPD2_310_GDEQ031T10::useFastFullUpdate);
 
     // DISPLAY SYSTEM TIME
-    Serial.print(", SYS_TIME: ");
+    Serial.print("SYSTEM_CLOCK: ");
     Serial.print(now.month(), DEC);
     Serial.print('/');
     Serial.print(now.day(), DEC);

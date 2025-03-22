@@ -1,4 +1,4 @@
-// EInk PDA V2.0
+// Eink PDA V2.0
 // @Ashtf 2025
 
 //   .oooooo..o oooooooooooo ooooooooooooo ooooo     ooo ooooooooo.    //
@@ -27,14 +27,14 @@
 // CONFIGURATION & SETTINGS
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////|
 #define KB_COOLDOWN 50                // Keypress cooldown
-#define FULL_REFRESH_AFTER 5          // Full refresh after N lines (CHANGE WITH CAUTION)
+#define FULL_REFRESH_AFTER 5          // Full refresh after N partial refreshes (CHANGE WITH CAUTION)
 #define MAX_FILES 10                  // Number of files to store
 #define TIMEOUT 300                   // Time until automatic sleep (Seconds)
 #define FORMAT_SPIFFS_IF_FAILED true  // Format the SPIFFS filesystem if mount fails
 #define DEBUG_VERBOSE true            // Spit out some extra information
 const   String SLEEPMODE = "TEXT";    // TEXT, SPLASH, CLOCK
 #define TXT_APP_STYLE 1               // 0: Old Style (NOT SUPPORTED), 1: New Style
-#define SET_CLOCK_ON_UPLOAD true      // Should system clock be set automatically on code upload?
+#define SET_CLOCK_ON_UPLOAD false     // Should system clock be set automatically on code upload?
 #define SYSTEM_CLOCK true             // Enable a small clock on the bottom of the screen.
 #define SHOW_YEAR false               // Show the year on the clock
 #define SAVE_POWER true               // Enable a slower clock speed to save battery with very little cost to performance
@@ -59,19 +59,20 @@ const   String SLEEPMODE = "TEXT";    // TEXT, SPLASH, CLOCK
 //u8g2_font_courR08_tf.h
 
 // PIN DEFINITION
-#define I2C_SCL 35
-#define I2C_SDA 36
-#define MPR121_ADDR 0x5A
+#define I2C_SCL       35
+#define I2C_SDA       36
+#define MPR121_ADDR   0x5A
 
-#define KB_IRQ 8
-#define PWR_BTN 38
-#define BAT_SENS 6
+#define KB_IRQ    8
+#define PWR_BTN   38
+#define BAT_SENS  6
 #define CHRG_SENS 39
-#define RTC_INT 1
+#define RTC_INT   1 
 
-// DISPLAY AND KEYBOARD SETUP
+// DISPLAY SETUP
 GxEPD2_BW<GxEPD2_310_GDEQ031T10, GxEPD2_310_GDEQ031T10::HEIGHT> display(GxEPD2_310_GDEQ031T10(/*CS=*/2, /*DC=*/21, /*RST=*/16, /*BUSY=*/37));
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
+volatile bool GxEPD2_310_GDEQ031T10::useFastFullUpdate = true;
 
 Adafruit_TCA8418 keypad;
 
@@ -127,6 +128,8 @@ TaskHandle_t einkHandlerTaskHandle = NULL;
 char currentKB[4][10];
 enum KBState {NORMAL,SHIFT,FUNC};
 KBState CurrentKBState = NORMAL;
+uint8_t partialCounter = 0;
+volatile bool forceSlowFullUpdate = true;
 
 // <TXT.ino>
 String currentWord = "";
@@ -241,53 +244,62 @@ void processKB() {
 
 // FUNCTION PROTOTYPES
 // <sysFunc.ino>
-// SYSTEM
-void checkTimeout();
-void TCA8418_irq();
-char updateKeypress();
-void printDebug();
-String vectorToString();
-void stringToVector();
-void saveFile();
-void loadFile();
-void delFile(String fileName);
-void renFile(String oldFile, String newFile);
-void copyFile(String oldFile, String newFile);
-void updateBattState();
-String removeChar(String str, char character);
-void appendToFile(String path, String inText);
-void setCpuSpeed(int newFreq);
-
-// SPIFFS
-void listDir(fs::FS &fs, const char *dirname);
-void readFile(fs::FS &fs, const char *path);
-String readFileToString(fs::FS &fs, const char *path);
-void writeFile(fs::FS &fs, const char *path, const char *message);
-void appendFile(fs::FS &fs, const char *path, const char *message);
-void renameFile(fs::FS &fs, const char *path1, const char *path2);
-void deleteFile(fs::FS &fs, const char *path);
+  // SYSTEM
+  void checkTimeout();
+  void TCA8418_irq();
+  char updateKeypress();
+  void printDebug();
+  String vectorToString();
+  void stringToVector();
+  void saveFile();
+  void loadFile();
+  void delFile(String fileName);
+  void renFile(String oldFile, String newFile);
+  void copyFile(String oldFile, String newFile);
+  void updateBattState();
+  String removeChar(String str, char character);
+  void appendToFile(String path, String inText);
+  void setCpuSpeed(int newFreq);
+  // SPIFFS
+  void listDir(fs::FS &fs, const char *dirname);
+  void readFile(fs::FS &fs, const char *path);
+  String readFileToString(fs::FS &fs, const char *path);
+  void writeFile(fs::FS &fs, const char *path, const char *message);
+  void appendFile(fs::FS &fs, const char *path, const char *message);
+  void renameFile(fs::FS &fs, const char *path1, const char *path2);
+  void deleteFile(fs::FS &fs, const char *path);
 
 // <TASKS.ino>
-std::vector<std::vector<String>> tasks;
+  std::vector<std::vector<String>> tasks;
 
 // <OLEDFunc.ino>
-void oledWord(String word);
-void oledLine(String line, bool doProgressBar = true);
+  void oledWord(String word);
+  void oledLine(String line, bool doProgressBar = true);
 
 // <einkFunc.ino>
-void refresh();
-void einkHandler(void *parameter);
-void statusBar(String input, bool fullWindow = false);
-void einkTextPartial(String text, bool noRefresh = false);
-void drawThickLine(int x0, int y0, int x1, int y1, int thickness);
-int countLines(String input, size_t maxLineLength = 29);
-void einkTextDynamic(bool doFull_, bool noRefresh = false);
-void setTXTFont(const GFXfont *font);
+  // Eink
+  void refresh();
+  void einkHandler(void *parameter);
+  void statusBar(String input, bool fullWindow = false);
+  void einkTextPartial(String text, bool noRefresh = false);
+  void drawThickLine(int x0, int y0, int x1, int y1, int thickness);
+  int countLines(String input, size_t maxLineLength = 29);
+  void einkTextDynamic(bool doFull_, bool noRefresh = false);
+  void setTXTFont(const GFXfont *font);
+  void setFastFullRefresh(bool setting);
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////|
 // SETUP
 void setup() {
   Serial.begin(115200);
   Wire.begin(I2C_SDA, I2C_SCL);
+
+  // OLED SETUP
+  u8g2.begin();
+  u8g2.setPowerSave(0);
+  u8g2.clearBuffer();
+  u8g2.sendBuffer();
+  oledWord("Eink PDA");
 
   // EINK HANDLER SETUP
   xTaskCreatePinnedToCore(
@@ -302,6 +314,7 @@ void setup() {
   display.init(115200);
   display.setRotation(3);
   display.setTextColor(GxEPD_BLACK);
+  display.setFullWindow();
 
   // MPR121 / SLIDER
   // mpr121_setup();
@@ -317,17 +330,10 @@ void setup() {
 
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_8, 0);
 
-  // OLED SETUP
-  u8g2.begin();
-  u8g2.setPowerSave(0);
-  u8g2.clearBuffer();
-  u8g2.sendBuffer();
-
   // KEYBOARD SETUP
   if (!keypad.begin(TCA8418_DEFAULT_ADDR, &Wire)) {
     Serial.println("Error Initializing the Keyboard");
-    while (1)
-      ;
+    while (1);
   }
   keypad.matrix(4, 10);
   pinMode(KB_IRQ, INPUT);
