@@ -9,6 +9,10 @@
 #include <Adafruit_TCA8418.h>
 #include <vector>
 #include <algorithm>
+#include <Buzzer.h>
+#include <USB.h>
+#include <USBMSC.h>
+#include <SD_MMC.h>
 #include "Adafruit_MPR121.h"
 #include "esp_cpu.h"
 #include "RTClib.h"
@@ -51,12 +55,18 @@ extern char keysArray[4][10];
 extern char keysArraySHFT[4][10];
 extern char keysArrayFN[4][10];
 
+// Buzzer
+extern Buzzer buzzer;
+
 // Touch slider
 extern Adafruit_MPR121 cap;
 
 // RTC
 extern RTC_PCF8563 rtc;
 extern const char daysOfTheWeek[7][12];
+
+// USB
+extern USBMSC msc;
 
 // GENERAL
 extern volatile int einkRefresh;
@@ -79,6 +89,7 @@ extern int prevTime;
 extern uint8_t prevSec;
 extern TaskHandle_t einkHandlerTaskHandle;
 extern char currentKB[4][10];
+extern volatile bool SDCARD_INSERT;
 
 enum KBState { NORMAL, SHIFT, FUNC };
 extern KBState CurrentKBState;
@@ -86,7 +97,7 @@ extern KBState CurrentKBState;
 extern uint8_t partialCounter;
 extern volatile bool forceSlowFullUpdate;
 
-enum AppState { HOME, TXT, FILEWIZ, USB, BT, SETTINGS, TASKS };
+enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS };
 extern const String appStateNames[];
 extern const unsigned char *appIcons[6];
 extern AppState CurrentAppState;
@@ -162,6 +173,7 @@ extern String workingFile;
   String removeChar(String str, char character);
   void appendToFile(String path, String inText);
   void setCpuSpeed(int newFreq);
+  void playJingle(String jingle);
 
   // SPIFFS
   void listDir(fs::FS &fs, const char *dirname);

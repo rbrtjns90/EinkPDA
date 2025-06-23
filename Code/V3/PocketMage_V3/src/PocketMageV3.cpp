@@ -94,6 +94,40 @@ void setup() {
   // SHOW "PocketMage" while DEVICE BOOTS
   oledWord("PocketMage");
 
+  // STARTUP JINGLE
+  playJingle("startup");
+
+  // WAKE INTERRUPT SETUP
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_8, 0);
+
+  // KEYBOARD SETUP
+  if (!keypad.begin(TCA8418_DEFAULT_ADDR, &Wire)) {
+    Serial.println("Error Initializing the Keyboard");
+    while (1);
+  }
+  keypad.matrix(4, 10);
+  pinMode(KB_IRQ, INPUT);
+  attachInterrupt(digitalPinToInterrupt(KB_IRQ), TCA8418_irq, CHANGE);
+  keypad.flush();
+  keypad.enableInterrupts();
+
+  // SD CARD SETUP
+  SD_MMC.setPins(SD_CLK, SD_CMD, SD_D0, 0,0,0);
+  if (!SD_MMC.begin("/sdcard", true) || SD_MMC.cardType() == CARD_NONE) {
+    Serial.println("MOUNT FAILED");
+    oledWord("SD Card Not Detected!");
+    delay(2000);
+    oledWord("Insert SD Card and Reboot!");
+    delay(5000);
+    // Put OLED to sleep
+    u8g2.setPowerSave(1);
+    // Shut Down Jingle
+    playJingle("shutdown");
+    // Sleep
+    esp_deep_sleep_start();
+    return;
+  }
+
   // EINK HANDLER SETUP
   xTaskCreatePinnedToCore(
     einkHandler,             // Function name (your user-defined function)
@@ -109,12 +143,6 @@ void setup() {
   display.setTextColor(GxEPD_BLACK);
   display.setFullWindow();
 
-  // MPR121 / SLIDER
-  if (!cap.begin(0x5A)) {
-    Serial.println("TouchPad Failed");
-    oledWord("TouchPad Failed");
-  }
-
   // POWER SETUP
   pinMode(PWR_BTN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PWR_BTN), PWR_BTN_irq, FALLING);
@@ -124,18 +152,11 @@ void setup() {
   if (SAVE_POWER) setCpuFrequencyMhz(40 );
   else            setCpuFrequencyMhz(240);
 
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_38, 0);
-
-  // KEYBOARD SETUP
-  if (!keypad.begin(TCA8418_DEFAULT_ADDR, &Wire)) {
-    Serial.println("Error Initializing the Keyboard");
-    while (1);
+  // MPR121 / SLIDER
+  if (!cap.begin(0x5A)) {
+    Serial.println("TouchPad Failed");
+    oledWord("TouchPad Failed");
   }
-  keypad.matrix(4, 10);
-  pinMode(KB_IRQ, INPUT);
-  attachInterrupt(digitalPinToInterrupt(KB_IRQ), TCA8418_irq, CHANGE);
-  keypad.flush();
-  keypad.enableInterrupts();
 
   // SPIFFS SETUP
   if (!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)) {
@@ -154,6 +175,9 @@ void setup() {
   // SET CLOCK IF NEEDED
   if (SET_CLOCK_ON_UPLOAD || rtc.lostPower()) rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   rtc.start();
+
+  DateTime now = rtc.now();
+  randomSeed(now.second());
 }
 
 void loop() {

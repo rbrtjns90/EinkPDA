@@ -19,27 +19,30 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////|
 
 // PIN DEFINITION
-#define I2C_SCL      35
-#define I2C_SDA      36
-#define MPR121_ADDR  0x5A
+#define I2C_SCL       35
+#define I2C_SDA       36
+#define MPR121_ADDR   0x5A
 
-#define KB_IRQ       8
-#define PWR_BTN      38
-#define BAT_SENS     6
-#define CHRG_SENS    39
-#define RTC_INT      1 
+#define KB_IRQ        8
+#define PWR_BTN       38
+#define BAT_SENS      4
+#define CHRG_SENS     39
+#define RTC_INT       1 
 
-#define SPI_MOSI     14
-#define SPI_SCK      15
+#define SPI_MOSI      14
+#define SPI_SCK       15
 
-#define OLED_CS      47
-#define OLED_DC      46
-#define OLED_RST     45
+#define OLED_CS       47
+#define OLED_DC       46
+#define OLED_RST      45
 
-#define EPD_CS       2
-#define EPD_DC       21
-#define EPD_RST      9
-#define EPD_BUSY     37
+#define EPD_CS        2
+#define EPD_DC        21
+#define EPD_RST       9
+#define EPD_BUSY      37
 
+#define SD_CLK        12
+#define SD_CMD        11
+#define SD_D0         13
 
 #endif

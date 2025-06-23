@@ -75,4 +75,16 @@ extern const unsigned char fontfont0 [] PROGMEM;
 extern const unsigned char scrolloled0 [] PROGMEM;
 
 //
+extern const unsigned char _ScreenSaver0 [] PROGMEM;
+extern const unsigned char _ScreenSaver1 [] PROGMEM;
+extern const unsigned char _ScreenSaver2 [] PROGMEM;
+extern const unsigned char _ScreenSaver3 [] PROGMEM;
+extern const unsigned char _ScreenSaver4 [] PROGMEM;
+extern const unsigned char _ScreenSaver5 [] PROGMEM;
+extern const unsigned char _ScreenSaver6 [] PROGMEM;
+extern const unsigned char _ScreenSaver7 [] PROGMEM;
+extern const unsigned char _ScreenSaver8 [] PROGMEM;
+extern const unsigned char* ScreenSaver_allArray[9];
+
+//
 #endif

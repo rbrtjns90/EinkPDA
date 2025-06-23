@@ -18,6 +18,9 @@ U8G2_SSD1326_ER_256X32_F_4W_HW_SPI u8g2(U8G2_R2, OLED_CS, OLED_DC, OLED_RST); //
 // Keypad setup
 Adafruit_TCA8418 keypad;
 
+// Buzzer
+Buzzer buzzer(17);
+
 char keysArray[4][10] = {
   { 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p' },
   { 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 8 },  //8:BKSP
@@ -46,6 +49,9 @@ Adafruit_MPR121 cap = Adafruit_MPR121();
 RTC_PCF8563 rtc;
 const char daysOfTheWeek[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 
+// USB
+USBMSC msc;
+
 // VARIABLES
   // GENERAL
   volatile int einkRefresh = FULL_REFRESH_AFTER;
@@ -71,6 +77,7 @@ const char daysOfTheWeek[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", 
   KBState CurrentKBState = NORMAL;
   uint8_t partialCounter = 0;
   volatile bool forceSlowFullUpdate = true;
+  volatile bool SDCARD_INSERT = false;
 
   const String appStateNames[] = { "txt", "filewiz", "usb", "bt", "settings", "tasks" };
   const unsigned char *appIcons[6] = { _homeIcons2, _homeIcons3, _homeIcons4, _homeIcons5, _homeIcons6, taskIconTasks0 };

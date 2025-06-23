@@ -227,6 +227,7 @@ void checkTimeout() {
         display.hibernate();
         
         //Sleep the device
+        playJingle("shutdown");
         esp_deep_sleep_start();
       }
   }
@@ -236,9 +237,9 @@ void checkTimeout() {
   
   if (PWR_BTN_event && CurrentHOMEState != NOWLATER) {
     PWR_BTN_event = false;
-    
-    //Save current work:
-    //Only save if alltext has significant content
+
+    // Save current work:
+    // Only save if alltext has significant content
     if (allText.length() > 10) {
       oledWord("Saving Work");
       saveFile();
@@ -257,27 +258,36 @@ void checkTimeout() {
 
       display.setFullWindow();
       display.fillScreen(GxEPD_WHITE);
-      //display.nextPage();
-      //display.hibernate();
-      //display.display(true);
-      //display.hibernate();
-      //delay(500);
+
+      // Shutdown Jingle
+      playJingle("shutdown");
     }
     else {
-      //Put OLED to sleep
+      // Put OLED to sleep
       u8g2.setPowerSave(1);
 
-      //Stop the einkHandler task
+      // Stop the einkHandler task
       if (einkHandlerTaskHandle != NULL) {
         vTaskDelete(einkHandlerTaskHandle);
         einkHandlerTaskHandle = NULL;
       }
 
+      // Shutdown Jingle
+      playJingle("shutdown");
+
       switch (CurrentAppState) {
-        case HOME:
-            display.setFullWindow();
-            display.drawBitmap(0, 0, sleep0, 320, 240, GxEPD_BLACK);
-          break;
+        case HOME: 
+          {
+          display.setFullWindow();
+          //display.drawBitmap(0, 0, sleep0, 320, 240, GxEPD_BLACK);
+          int randomScreenSaver = random(0, sizeof(ScreenSaver_allArray) / sizeof(ScreenSaver_allArray[0]));
+          display.drawBitmap(0, 0, ScreenSaver_allArray[randomScreenSaver], 320, 240, GxEPD_BLACK);
+          forceSlowFullUpdate = true;
+          refresh();
+          display.drawBitmap(0, 0, ScreenSaver_allArray[randomScreenSaver], 320, 240, GxEPD_BLACK);
+
+          break; 
+          }
         case TXT:
           if (SLEEPMODE == "TEXT" && editingFile != "") {
             prevAllText = allText;
@@ -309,7 +319,7 @@ void checkTimeout() {
       refresh();
       display.hibernate();
       
-      //Sleep the device
+      // Sleep the device
       esp_deep_sleep_start();
     }
     
@@ -491,6 +501,29 @@ void printDebug() {
     Serial.print(now.second(), DEC);
     
     Serial.println();
+  }
+}
+
+void playJingle(String jingle) {
+  if (jingle == "startup") {
+    buzzer.begin(0);
+    buzzer.sound(NOTE_A8, 120);
+    buzzer.sound(NOTE_B8, 120);
+    buzzer.sound(NOTE_C8, 120);
+    buzzer.sound(NOTE_D8, 120);
+    buzzer.sound(0, 80);
+    buzzer.end(0);
+    return;
+  }
+  else if (jingle == "shutdown") {
+    buzzer.begin(0);
+    buzzer.sound(NOTE_D8, 120);
+    buzzer.sound(NOTE_C8, 120);
+    buzzer.sound(NOTE_B8, 120);
+    buzzer.sound(NOTE_A8, 120);
+    buzzer.sound(0, 80);
+    buzzer.end(0);
+    return;
   }
 }
 
