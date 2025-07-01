@@ -50,7 +50,7 @@ void processKB_FILEWIZ() {
         //Make sure oled only updates at 60fps
         if (currentMillis - OLEDFPSMillis >= 16) {
           OLEDFPSMillis = currentMillis;
-          oledWord(currentWord);
+          oledLine(currentWord, false);
         }
         KBBounceMillis = currentMillis;
       }
@@ -97,7 +97,7 @@ void processKB_FILEWIZ() {
         //Make sure oled only updates at 60fps
         if (currentMillis - OLEDFPSMillis >= 16) {
           OLEDFPSMillis = currentMillis;
-          oledWord(currentWord);
+          oledLine(currentWord, false);
         }
         KBBounceMillis = currentMillis;
       }
@@ -140,7 +140,7 @@ void processKB_FILEWIZ() {
         //Make sure oled only updates at 60fps
         if (currentMillis - OLEDFPSMillis >= 16) {
           OLEDFPSMillis = currentMillis;
-          oledWord(currentWord);
+          oledLine(currentWord, false);
         }
         KBBounceMillis = currentMillis;
       }
@@ -306,7 +306,7 @@ void einkHandler_FILEWIZ() {
 
         // DRAW FILE LIST
         keypad.disableInterrupts();
-        listDir(SPIFFS, "/");
+        listDir(SD_MMC, "/");
         keypad.enableInterrupts();
 
         for (int i = 0; i < MAX_FILES; i++) {

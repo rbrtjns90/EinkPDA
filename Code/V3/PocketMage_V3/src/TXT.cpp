@@ -408,7 +408,7 @@ void einkHandler_TXT() {
         display.drawBitmap(60,0,fileWizLiteallArray[0],200,218, GxEPD_BLACK);
 
         keypad.disableInterrupts();
-        listDir(SPIFFS, "/");
+        listDir(SD_MMC, "/");
         keypad.enableInterrupts();
 
         for (int i = 0; i < MAX_FILES; i++) {
@@ -608,15 +608,33 @@ void processKB_TXT_NEW() {
           else oledScroll();
         }
 
-        // NEW METHOD
         if (currentLine.length() > 0) {
           int16_t x1, y1;
           uint16_t charWidth, charHeight;
           display.getTextBounds(currentLine, 0, 0, &x1, &y1, &charWidth, &charHeight);
 
           if (charWidth >= display.width()-5) {
-            allLines.push_back(currentLine);
-            currentLine = "";
+            // If currentLine ends with a space, just start a new line
+            if (currentLine.endsWith(" ")) {
+              allLines.push_back(currentLine);
+              currentLine = "";
+            }
+            // If currentLine ends with a letter, we are in the middle of a word
+            else {
+              int lastSpace = currentLine.lastIndexOf(' ');
+              String partialWord;
+
+              if (lastSpace != -1) {
+                partialWord = currentLine.substring(lastSpace + 1);
+                currentLine = currentLine.substring(0, lastSpace);  // Strip partial word
+                currentLine = partialWord;  // Start new line with the partial word
+              } 
+              // No spaces found, whole line is a single word
+              else {
+                allLines.push_back(currentLine);
+                currentLine = "";
+              }
+            }
             newLineAdded = true;
           }
         }
@@ -671,7 +689,7 @@ void processKB_TXT_NEW() {
         //Make sure oled only updates at 60fps
         if (currentMillis - OLEDFPSMillis >= 16) {
           OLEDFPSMillis = currentMillis;
-          oledWord(currentWord);
+          oledLine(currentWord, false);
         }
         break;
       case WIZ1:
@@ -703,6 +721,8 @@ void processKB_TXT_NEW() {
             else {
               //Save current file
               saveFile();
+
+              delay(200);
               //Load new file
               loadFile();
               //Return to TXT
@@ -733,7 +753,7 @@ void processKB_TXT_NEW() {
         //Make sure oled only updates at 60fps
         if (currentMillis - OLEDFPSMillis >= 16) {
           OLEDFPSMillis = currentMillis;
-          oledWord(currentWord);
+          oledLine(currentWord, false);
         }
         break;
 
@@ -770,6 +790,8 @@ void processKB_TXT_NEW() {
 
           //Save the file
           saveFile();
+
+          delay(200);
           //Load new file
           loadFile();
 
@@ -796,7 +818,7 @@ void processKB_TXT_NEW() {
         //Make sure oled only updates at 60fps
         if (currentMillis - OLEDFPSMillis >= 16) {
           OLEDFPSMillis = currentMillis;
-          oledWord(currentWord);
+          oledLine(currentWord, false);
         }
         break;
       case WIZ3:
@@ -853,7 +875,7 @@ void processKB_TXT_NEW() {
         //Make sure oled only updates at 60fps
         if (currentMillis - OLEDFPSMillis >= 16) {
           OLEDFPSMillis = currentMillis;
-          oledWord(currentWord);
+          oledLine(currentWord, false);
         }
         break;
       case FONT:
@@ -915,7 +937,7 @@ void processKB_TXT_NEW() {
         //Make sure oled only updates at 60fps
         if (currentMillis - OLEDFPSMillis >= 16) {
           OLEDFPSMillis = currentMillis;
-          oledWord(currentWord);
+          oledLine(currentWord, false);
         }
         break;
 
@@ -960,7 +982,7 @@ void einkHandler_TXT_NEW() {
         display.drawBitmap(60,0,fileWizLiteallArray[0],200,218, GxEPD_BLACK);
 
         keypad.disableInterrupts();
-        listDir(SPIFFS, "/");
+        listDir(SD_MMC, "/");
         keypad.enableInterrupts();
 
         for (int i = 0; i < MAX_FILES; i++) {
@@ -1028,7 +1050,7 @@ void einkHandler_TXT_NEW() {
         display.drawBitmap(60,0,fontfont0,200,218, GxEPD_BLACK);
 
         keypad.disableInterrupts();
-        listDir(SPIFFS, "/");
+        listDir(SD_MMC, "/");
         keypad.enableInterrupts();
 
         for (int i = 0; i < 7; i++) {
