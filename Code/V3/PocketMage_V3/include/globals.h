@@ -90,6 +90,7 @@ extern uint8_t prevSec;
 extern TaskHandle_t einkHandlerTaskHandle;
 extern char currentKB[4][10];
 extern volatile bool SDCARD_INSERT;
+extern bool noSD;
 
 enum KBState { NORMAL, SHIFT, FUNC };
 extern KBState CurrentKBState;
@@ -165,9 +166,12 @@ extern String workingFile;
   String vectorToString();
   void stringToVector(String inputText);
   void saveFile();
+  void writeMetadata(const String& path);
   void loadFile();
   void delFile(String fileName);
+  void deleteMetadata(String path);
   void renFile(String oldFile, String newFile);
+  void renMetadata(String oldPath, String newPath);
   void copyFile(String oldFile, String newFile);
   void updateBattState();
   String removeChar(String str, char character);
@@ -175,7 +179,7 @@ extern String workingFile;
   void setCpuSpeed(int newFreq);
   void playJingle(String jingle);
 
-  // SPIFFS
+  // microSD
   void listDir(fs::FS &fs, const char *dirname);
   void readFile(fs::FS &fs, const char *path);
   String readFileToString(fs::FS &fs, const char *path);
@@ -189,6 +193,7 @@ extern String workingFile;
 void oledWord(String word);
 void oledLine(String line, bool doProgressBar = true);
 void oledScroll();
+void infoBar();
 
 // <einkFunc.ino>
 void refresh();
