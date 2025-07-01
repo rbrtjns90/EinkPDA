@@ -78,6 +78,7 @@ USBMSC msc;
   uint8_t partialCounter = 0;
   volatile bool forceSlowFullUpdate = true;
   volatile bool SDCARD_INSERT = false;
+  bool noSD = false;
 
   const String appStateNames[] = { "txt", "filewiz", "usb", "bt", "settings", "tasks" };
   const unsigned char *appIcons[6] = { _homeIcons2, _homeIcons3, _homeIcons4, _homeIcons5, _homeIcons6, taskIconTasks0 };
