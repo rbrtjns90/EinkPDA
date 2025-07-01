@@ -21,6 +21,9 @@ void refresh() {
   }
 
   display.display(false);
+
+  display.setFullWindow();
+  display.fillScreen(GxEPD_WHITE);
   display.hibernate();
 }
 
@@ -39,9 +42,10 @@ void einkHandler(void* parameter) {
   display.hibernate();*/
 
   while (true) {
-    display.setFullWindow();
-    display.fillScreen(GxEPD_WHITE);
     applicationEinkHandler();
+
+    vTaskDelay(50 / portTICK_PERIOD_MS);
+    yield();
   }
 }
 
