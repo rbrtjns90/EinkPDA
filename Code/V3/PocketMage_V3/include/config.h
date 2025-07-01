@@ -3,19 +3,21 @@
 
 // CONFIGURATION & SETTINGS
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////|
-#define KB_COOLDOWN 50                // Keypress cooldown
-#define FULL_REFRESH_AFTER 5          // Full refresh after N partial refreshes (CHANGE WITH CAUTION)
-#define MAX_FILES 10                  // Number of files to store
-#define TIMEOUT 300                   // Time until automatic sleep (Seconds)
-#define FORMAT_SPIFFS_IF_FAILED true  // Format the SPIFFS filesystem if mount fails
-#define DEBUG_VERBOSE true            // Spit out some extra information
-#define SLEEPMODE "TEXT"              // TEXT, SPLASH, CLOCK
-#define TXT_APP_STYLE 1               // 0: Old Style (NOT SUPPORTED), 1: New Style
-#define SET_CLOCK_ON_UPLOAD false     // Should system clock be set automatically on code upload?
-#define SYSTEM_CLOCK true             // Enable a small clock on the bottom of the screen.
-#define SHOW_YEAR false               // Show the year on the clock
-#define SAVE_POWER true               // Enable a slower CPU clock speed to save battery with little cost to performance
-#define TOUCH_TIMEOUT_MS 1200         // Delay after scrolling to return to typing mode
+#define KB_COOLDOWN 50                          // Keypress cooldown
+#define FULL_REFRESH_AFTER 5                    // Full refresh after N partial refreshes (CHANGE WITH CAUTION)
+#define MAX_FILES 10                            // Number of files to store
+#define TIMEOUT 120                             // Time until automatic sleep (Seconds)
+#define FORMAT_SPIFFS_IF_FAILED true            // Format the SPIFFS filesystem if mount fails
+#define DEBUG_VERBOSE true                      // Spit out some extra information
+#define SLEEPMODE "TEXT"                        // TEXT, SPLASH, CLOCK
+#define TXT_APP_STYLE 1                         // 0: Old Style (NOT SUPPORTED), 1: New Style
+#define SET_CLOCK_ON_UPLOAD false               // Should system clock be set automatically on code upload?
+#define SYSTEM_CLOCK true                       // Enable a small clock on the bottom of the screen.
+#define SHOW_YEAR true                          // Show the year on the clock
+#define SAVE_POWER true                         // Enable a slower CPU clock speed to save battery with little cost to performance
+#define TOUCH_TIMEOUT_MS 1200                   // Delay after scrolling to return to typing mode (ms)
+#define ALLOW_NO_MICROSD false                  // Allow the device to operate with no SD card
+#define SYS_METADATA_FILE "/sys/SDMMC_META.txt" // File path to the file system metadata file
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////|
 
 // PIN DEFINITION
