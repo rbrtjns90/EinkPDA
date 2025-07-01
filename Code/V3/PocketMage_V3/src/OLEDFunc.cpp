@@ -82,9 +82,9 @@ void oledLine(String line, bool doProgressBar) {
     // LINE END WARNING INDICATOR
     if (charWidth > ((display.width()-5) * 0.8)) {   
       if ((millis() / 400) % 2 == 0) {  // ON for 200ms, OFF for 200ms
-        u8g2.drawVLine(127, 8, 32-16);
-        u8g2.drawLine(127,15,124,12);
-        u8g2.drawLine(127,15,124,18);
+        u8g2.drawVLine(u8g2.getDisplayWidth()-1, 8, 32-16);
+        u8g2.drawLine(u8g2.getDisplayWidth()-1,15,u8g2.getDisplayWidth()-4,12);
+        u8g2.drawLine(u8g2.getDisplayWidth()-1,15,u8g2.getDisplayWidth()-4,18);
       }
     }
   }
@@ -102,6 +102,21 @@ void oledLine(String line, bool doProgressBar) {
       break;
   }
 
+  infoBar();
+
+  // DRAW LINE TEXT
+  u8g2.setFont(u8g2_font_ncenB18_tr);
+  if (u8g2.getStrWidth(line.c_str()) < (u8g2.getDisplayWidth() - 5)) {
+    u8g2.drawStr(0,19,line.c_str());
+  }
+  else {
+    u8g2.drawStr(u8g2.getDisplayWidth()-8-u8g2.getStrWidth(line.c_str()),19,line.c_str());
+  }
+
+  u8g2.sendBuffer();
+}
+
+void infoBar() {
   // CLOCK
   if (SYSTEM_CLOCK) {
     u8g2.setFont(u8g2_font_5x7_tf);
@@ -119,11 +134,8 @@ void oledLine(String line, bool doProgressBar) {
     u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getStrWidth(day3Char.c_str()), u8g2.getDisplayHeight(), day3Char.c_str());    
   }
 
-  // DRAW LINE TEXT
-  u8g2.setFont(u8g2_font_ncenB18_tr);
-  u8g2.drawStr(u8g2.getDisplayWidth()-8-u8g2.getStrWidth(line.c_str()),16+3,line.c_str());
-
-  u8g2.sendBuffer();
+  // Battery Indicator
+  
 }
 
 void oledScroll() {
