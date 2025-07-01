@@ -64,7 +64,7 @@ void processKB() {
       break;
     // ADD APP CASES HERE
     default:
-      einkHandler_HOME();
+      processKB_HOME();
       break;
   }
 }
@@ -92,12 +92,13 @@ void setup() {
   u8g2.sendBuffer();
 
   // SHOW "PocketMage" while DEVICE BOOTS
-  oledWord("PocketMage");
+  oledWord("   PocketMage   ");
 
   // STARTUP JINGLE
   playJingle("startup");
 
   // WAKE INTERRUPT SETUP
+  pinMode(KB_IRQ, INPUT);
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_8, 0);
 
   // KEYBOARD SETUP
@@ -106,26 +107,38 @@ void setup() {
     while (1);
   }
   keypad.matrix(4, 10);
-  pinMode(KB_IRQ, INPUT);
   attachInterrupt(digitalPinToInterrupt(KB_IRQ), TCA8418_irq, CHANGE);
   keypad.flush();
   keypad.enableInterrupts();
 
   // SD CARD SETUP
-  SD_MMC.setPins(SD_CLK, SD_CMD, SD_D0, 0,0,0);
+  SD_MMC.setPins(SD_CLK, SD_CMD, SD_D0);
   if (!SD_MMC.begin("/sdcard", true) || SD_MMC.cardType() == CARD_NONE) {
     Serial.println("MOUNT FAILED");
     oledWord("SD Card Not Detected!");
     delay(2000);
-    oledWord("Insert SD Card and Reboot!");
-    delay(5000);
-    // Put OLED to sleep
-    u8g2.setPowerSave(1);
-    // Shut Down Jingle
-    playJingle("shutdown");
-    // Sleep
-    esp_deep_sleep_start();
-    return;
+    if (ALLOW_NO_MICROSD) {
+      oledWord("All Work Will Be Lost!");
+      delay(5000);
+      noSD = true;
+    }
+    else {
+      oledWord("Insert SD Card and Reboot!");
+      delay(5000);
+      // Put OLED to sleep
+      u8g2.setPowerSave(1);
+      // Shut Down Jingle
+      playJingle("shutdown");
+      // Sleep
+      esp_deep_sleep_start();
+      return;
+    }
+  }
+
+  // Create /sys folder if it does not exist
+  if (!SD_MMC.exists("/sys")) {
+    if (SD_MMC.mkdir("/sys")) Serial.println("Created /sys folder.");
+    else                      Serial.println("Failed to create /sys folder.");
   }
 
   // EINK HANDLER SETUP
@@ -136,7 +149,7 @@ void setup() {
     NULL,                    // Parameters (none in this case)
     1,                       // Priority (1 is low priority)
     &einkHandlerTaskHandle,  // Task handle
-    1                        // Core ID (0 for core 0, 1 for core 1)
+    0                        // Core ID (0 for core 0, 1 for core 1)
   );
   display.init(115200);
   display.setRotation(3);
@@ -149,6 +162,8 @@ void setup() {
   pinMode(CHRG_SENS, INPUT);
   //WiFi.mode(WIFI_OFF);
   //btStop();
+
+  // SET CPU CLOCK FOR POWER SAVE MODE
   if (SAVE_POWER) setCpuFrequencyMhz(40 );
   else            setCpuFrequencyMhz(240);
 
@@ -156,13 +171,6 @@ void setup() {
   if (!cap.begin(0x5A)) {
     Serial.println("TouchPad Failed");
     oledWord("TouchPad Failed");
-  }
-
-  // SPIFFS SETUP
-  if (!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)) {
-    Serial.println("SPIFFS Mount Failed");
-    oledWord("SPIFFS Failed");
-    delay(1000);
   }
 
   // RTC SETUP
@@ -181,9 +189,13 @@ void setup() {
 }
 
 void loop() {
-  if (!noTimeout) checkTimeout();
+  if (!noTimeout)  checkTimeout();
   if (DEBUG_VERBOSE) printDebug();
-  updateBattState();
 
+  updateBattState();
   processKB();
+
+  // Yield to watchdog
+  vTaskDelay(50 / portTICK_PERIOD_MS);
+  yield();
 }
