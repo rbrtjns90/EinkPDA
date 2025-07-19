@@ -15,7 +15,7 @@ void commandSelect(String command) {
     command = removeChar(command, ' ');
     command = removeChar(command, '-');
     keypad.disableInterrupts();
-    listDir(SPIFFS, "/");
+    listDir(SD_MMC, "/");
     keypad.enableInterrupts();
 
     for (uint8_t i = 0; i < (sizeof(filesList) / sizeof(filesList[0])); i++) {
@@ -37,7 +37,7 @@ void commandSelect(String command) {
     command = removeChar(command, ' ');
     command = removeChar(command, '/');
     keypad.disableInterrupts();
-    listDir(SPIFFS, "/");
+    listDir(SD_MMC, "/");
     keypad.enableInterrupts();
 
     for (uint8_t i = 0; i < (sizeof(filesList) / sizeof(filesList[0])); i++) {
@@ -73,28 +73,19 @@ void commandSelect(String command) {
   } 
   /////////////////////////////
   else if (command == "note" || command == "text" || command == "write" || command == "notebook" || command == "notepad" || command == "txt" || command == "1") {
-    CurrentAppState = TXT;
-    CurrentKBState  = NORMAL;
-    dynamicScroll = 0;
-    newLineAdded = true;
+    TXT_INIT();
   }
   /////////////////////////////
   else if (command == "file wizard" || command == "wiz" || command == "file wiz" || command == "file" || command == "2") {
-    CurrentAppState = FILEWIZ;
-    CurrentKBState  = NORMAL;
-    forceSlowFullUpdate = true;
-    newState = true;
+    FILEWIZ_INIT();
   }
   /////////////////////////////
   else if (command == "back up" || command == "export" || command == "transfer" || command == "usb transfer" || command == "usb" || command == "3") {
-    // OPEN USB FILE TRANSFER
+    USB_INIT();
   }
   /////////////////////////////
-  else if (command == "tasks" || command == "task") {
-    CurrentAppState = TASKS;
-    CurrentTasksState = TASKS0;
-    forceSlowFullUpdate = true;
-    newState = true;
+  else if (command == "tasks" || command == "task" || command == "6") {
+    TASKS_INIT();
   }
   /////////////////////////////
   else if (command == "bluetooth" || command == "bt" || command == "4") {
@@ -102,7 +93,13 @@ void commandSelect(String command) {
   }
   /////////////////////////////
   else if (command == "preferences" || command == "setting" || command == "settings" || command == "5") {
-    // OPEN SETTINGS
+    SETTINGS_INIT();
+  }
+  else if (command == "cal" || command == "calendar" || command == "7") {
+    CALENDAR_INIT();
+  }
+  else if (command == "lex" || command == "lexicon" || command == "dict" || command == "dictionary" || command == "9") {
+    LEXICON_INIT();
   }
   /////////////////////////////
   else if (command == "i farted") {
@@ -134,8 +131,7 @@ void commandSelect(String command) {
     delay(1000);
   } 
   else {
-    oledWord("Huh?");
-    delay(1000);
+    settingCommandSelect(command);
   }
 }
 
@@ -187,62 +183,12 @@ void processKB_HOME() {
         }
 
         currentMillis = millis();
-        //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        //Make sure oled only updates at OLED_MAX_FPS
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledLine(currentLine, false);
         }
       }
-      /*disableTimeout = false;
-      if (OLEDPowerSave) {
-        u8g2.setPowerSave(0);
-        OLEDPowerSave = false;
-      }
-      CurrentKBState = FUNC;
-      //Make sure oled only updates at 60fps
-      if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
-        char inchar = updateKeypress();
-        //No char recieved
-        if (inchar == 0);
-        //BKSP Recieved
-        else if (inchar == 127 || inchar == 8) {}
-        else {
-          int fileIndex = (inchar == '0') ? 10 : (inchar - '0');
-          //Edit a new file
-          switch (fileIndex) {
-            case 1: //TXT
-              CurrentAppState = TXT;
-              CurrentKBState  = NORMAL;
-              einkRefresh = FULL_REFRESH_AFTER + 1;
-              //newState = true;
-              newLineAdded = true;
-              break;
-            case 2: //FILE WIZARD
-              CurrentAppState = FILEWIZ;
-              CurrentKBState  = FUNC;
-              einkRefresh = FULL_REFRESH_AFTER + 1;
-              newState = true;
-              break;
-            case 3: //USB TRANSFER
-              CurrentAppState = USB;
-              break;
-            case 4: //BLUETOOTH TRANSFER
-              CurrentAppState = BT;
-              break;
-            case 5: //SETTINGS
-              CurrentAppState = SETTINGS;
-              break;
-          }
-        }
-
-        currentMillis = millis();
-        //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
-          OLEDFPSMillis = currentMillis;
-          oledWord(currentWord);
-        }
-        KBBounceMillis = currentMillis;
-      }*/
       break;
 
     case NOWLATER:
@@ -263,6 +209,7 @@ void einkHandler_HOME() {
         newState = false;
         drawHome();
         refresh();
+        //multiPassRefesh(2);
       }
       break;
 
@@ -315,6 +262,7 @@ void einkHandler_HOME() {
           }
         }
 
+        forceSlowFullUpdate = true;
         refresh();
       }
       break;
@@ -349,5 +297,5 @@ void drawHome() {
   }
   display.setFont(&FreeMonoBold9pt7b);
 
-  drawStatusBar(" Type What You Want To Do");
+  drawStatusBar("Type a Command:");
 }

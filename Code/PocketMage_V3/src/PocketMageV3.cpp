@@ -33,6 +33,18 @@ void applicationEinkHandler() {
     case TASKS:
       einkHandler_TASKS();
       break;
+    case SETTINGS:
+      einkHandler_settings();
+      break;
+    case USB_APP:
+      einkHandler_USB();
+      break;
+    case CALENDAR:
+      einkHandler_CALENDAR();
+      break;
+    case LEXICON:
+      einkHandler_LEXICON();
+      break;
     // ADD APP CASES HERE
     default:
       einkHandler_HOME();
@@ -61,6 +73,18 @@ void processKB() {
       break;
     case TASKS:
       processKB_TASKS();
+      break;
+    case SETTINGS:
+      processKB_settings();
+      break;
+    case USB_APP:
+      processKB_USB();
+      break;
+    case CALENDAR:
+      processKB_CALENDAR();
+      break;
+    case LEXICON:
+      processKB_LEXICON();
       break;
     // ADD APP CASES HERE
     default:
@@ -92,20 +116,10 @@ void setup() {
   u8g2.sendBuffer();
 
   // SHOW "PocketMage" while DEVICE BOOTS
-  oledWord("   PocketMage   ");
+  oledWord("   PocketMage   ", true, false);
 
   // STARTUP JINGLE
   playJingle("startup");
-
-  // LOAD PREFERENCES
-  prefs.begin("settings", true); // Open in read-only mode
-  TIMEOUT           = prefs.getInt("TIMEOUT", 120);
-  DEBUG_VERBOSE     = prefs.getBool("DEBUG_VERBOSE", true);
-  SYSTEM_CLOCK      = prefs.getBool("SYSTEM_CLOCK", true);
-  SHOW_YEAR         = prefs.getBool("SHOW_YEAR", true);
-  SAVE_POWER        = prefs.getBool("SAVE_POWER", true);
-  ALLOW_NO_MICROSD  = prefs.getBool("ALLOW_NO_SD", false);
-  prefs.end();
 
   // WAKE INTERRUPT SETUP
   pinMode(KB_IRQ, INPUT);
@@ -114,6 +128,8 @@ void setup() {
   // KEYBOARD SETUP
   if (!keypad.begin(TCA8418_DEFAULT_ADDR, &Wire)) {
     Serial.println("Error Initializing the Keyboard");
+    oledWord("Keyboard INIT Failed");
+    delay(1000);
     while (1);
   }
   keypad.matrix(4, 10);
@@ -145,18 +161,34 @@ void setup() {
     }
   }
 
-  // Create /sys folder if it does not exist
-  if (!SD_MMC.exists("/sys")) {
-    if (SD_MMC.mkdir("/sys")) Serial.println("Created /sys folder.");
-    else                      Serial.println("Failed to create /sys folder.");
+  // Create folders and files if needed
+  if (!SD_MMC.exists("/sys"))     SD_MMC.mkdir("/sys");
+  if (!SD_MMC.exists("/journal")) SD_MMC.mkdir("/journal");
+  if (!SD_MMC.exists("/dict")) SD_MMC.mkdir("/dict");
+  if (!SD_MMC.exists("/sys/events.txt")) {
+    File f = SD_MMC.open("/sys/events.txt", FILE_WRITE);
+    if (f) f.close();
   }
+  if (!SD_MMC.exists("/sys/events.txt")) {
+    File f = SD_MMC.open("/sys/events.txt", FILE_WRITE);
+    if (f) f.close();
+  }
+  if (!SD_MMC.exists("/sys/tasks.txt")) {
+    File f = SD_MMC.open("/sys/tasks.txt", FILE_WRITE);
+    if (f) f.close();
+  }
+  if (!SD_MMC.exists("/sys/SDMMC_META.txt")) {
+    File f = SD_MMC.open("/sys/SDMMC_META.txt", FILE_WRITE);
+    if (f) f.close();
+  }
+ 
+  loadState();
 
   // EINK HANDLER SETUP
   display.init(115200);
   display.setRotation(3);
   display.setTextColor(GxEPD_BLACK);
   display.setFullWindow();
-  newState = true;
 
   xTaskCreatePinnedToCore(
     einkHandler,             // Function name (your user-defined function)
@@ -181,9 +213,10 @@ void setup() {
   else            setCpuFrequencyMhz(240);
 
   // MPR121 / SLIDER
-  if (!cap.begin(0x5A)) {
+  if (!cap.begin(MPR121_ADDR)) {
     Serial.println("TouchPad Failed");
     oledWord("TouchPad Failed");
+    delay(1000);
   }
 
   // RTC SETUP

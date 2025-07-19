@@ -7,6 +7,13 @@
 //  o888o        o888o o888ooooood8 o888ooooood8       `8'      `8'       o888o .8888888888P   //
 #include "globals.h"
 
+void FILEWIZ_INIT() {
+  CurrentAppState = FILEWIZ;
+  CurrentKBState  = NORMAL;
+  forceSlowFullUpdate = true;
+  newState = true;
+}
+
 void processKB_FILEWIZ() {
   if (OLEDPowerSave) {
     u8g2.setPowerSave(0);
@@ -48,7 +55,7 @@ void processKB_FILEWIZ() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledLine(currentWord, false);
         }
@@ -95,7 +102,7 @@ void processKB_FILEWIZ() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledLine(currentWord, false);
         }
@@ -138,7 +145,7 @@ void processKB_FILEWIZ() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledLine(currentWord, false);
         }
@@ -210,7 +217,7 @@ void processKB_FILEWIZ() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledLine(currentWord, false);
         }
@@ -281,7 +288,7 @@ void processKB_FILEWIZ() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledLine(currentWord, false);
         }

@@ -27,6 +27,21 @@ void refresh() {
   display.hibernate();
 }
 
+void multiPassRefesh(int passes) {
+  display.display(false);
+  if (passes > 0) {
+    for (int i = 0; i < passes; i++) {
+      delay(250);
+      display.display(true);
+    }
+  }
+  
+  delay(100);
+  display.setFullWindow();
+  display.fillScreen(GxEPD_WHITE);
+  display.hibernate();
+}
+
 void setFastFullRefresh(bool setting) {
   GxEPD2_310_GDEQ031T10::useFastFullUpdate = setting;
   /*if (GxEPD2_310_GDEQ031T10::useFastFullUpdate != setting) {
@@ -186,10 +201,11 @@ void einkTextDynamic(bool doFull_, bool noRefresh) {
 
   // FULL REFRESH OPERATION
   if (doFull_) {
+    display.fillScreen(GxEPD_WHITE);
     for (uint8_t i = size - displayLines - scrollOffset; i < size - scrollOffset; i++) {
       if ((allLines[i]).length() > 0) {
         display.setFullWindow();
-        display.fillRect(0, (fontHeight + lineSpacing) * (i - (size - displayLines - scrollOffset)), display.width(), (fontHeight + lineSpacing), GxEPD_WHITE);
+        //display.fillRect(0, (fontHeight + lineSpacing) * (i - (size - displayLines - scrollOffset)), display.width(), (fontHeight + lineSpacing), GxEPD_WHITE);
         display.setCursor(0, fontHeight + ((fontHeight + lineSpacing) * (i - (size - displayLines - scrollOffset))));
         display.print(allLines[i]);
         Serial.println(allLines[i]);

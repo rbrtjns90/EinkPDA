@@ -7,21 +7,25 @@
 //   `Y8bood8P'  o888ooooood8 o888ooooood8 o888bood8P'    //     
 #include "globals.h"
                                                      
-void oledWord(String word) {
+void oledWord(String word, bool allowLarge, bool showInfo) {
   u8g2.clearBuffer();
 
-  u8g2.setFont(u8g2_font_ncenB24_tr);
-  if (u8g2.getStrWidth(word.c_str()) < u8g2.getDisplayWidth()) {
-    u8g2.drawStr((u8g2.getDisplayWidth() - u8g2.getStrWidth(word.c_str()))/2,16+12,word.c_str());
-    u8g2.sendBuffer();
-    return;
-  }
+  if (showInfo) infoBar();
 
-  u8g2.setFont(u8g2_font_ncenB18_tr);
-  if (u8g2.getStrWidth(word.c_str()) < u8g2.getDisplayWidth()) {
-    u8g2.drawStr((u8g2.getDisplayWidth() - u8g2.getStrWidth(word.c_str()))/2,16+9,word.c_str());
-    u8g2.sendBuffer();
-    return;
+  if (allowLarge) {
+    /*u8g2.setFont(u8g2_font_ncenB24_tr);
+    if (u8g2.getStrWidth(word.c_str()) < u8g2.getDisplayWidth()) {
+      u8g2.drawStr((u8g2.getDisplayWidth() - u8g2.getStrWidth(word.c_str()))/2,16+12,word.c_str());
+      u8g2.sendBuffer();
+      return;
+    }*/
+
+    u8g2.setFont(u8g2_font_ncenB18_tr);
+    if (u8g2.getStrWidth(word.c_str()) < u8g2.getDisplayWidth()) {
+      u8g2.drawStr((u8g2.getDisplayWidth() - u8g2.getStrWidth(word.c_str()))/2,16+9,word.c_str());
+      u8g2.sendBuffer();
+      return;
+    }
   }
 
   u8g2.setFont(u8g2_font_ncenB14_tr);
@@ -117,25 +121,44 @@ void oledLine(String line, bool doProgressBar) {
 }
 
 void infoBar() {
+  int infoWidth = 16;
+
+  // Battery Indicator
+  u8g2.drawXBMP(0,u8g2.getDisplayHeight()-6,10,6,batt_allArray[battState]);
+
   // CLOCK
   if (SYSTEM_CLOCK) {
     u8g2.setFont(u8g2_font_5x7_tf);
-    //u8g2.setFont(u8g2_font_tinytim_tf);
     DateTime now = rtc.now();
     String timeString = "";
     timeString += String(now.hour());
     timeString += ":";
     if (now.minute() < 10) timeString += ("0"+String(now.minute()));
     else timeString += String(now.minute());
-    u8g2.drawStr(16,u8g2.getDisplayHeight(),timeString.c_str());
+    u8g2.drawStr(infoWidth,u8g2.getDisplayHeight(),timeString.c_str());
     String day3Char = String(daysOfTheWeek[now.dayOfTheWeek()]).substring(0, 3);
     if (SHOW_YEAR) day3Char += (" "+String(now.month())+"/"+String(now.day())+"/"+String(now.year()).substring(2,4)); 
     else           day3Char += (" "+String(now.month())+"/"+String(now.day())); 
     u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getStrWidth(day3Char.c_str()), u8g2.getDisplayHeight(), day3Char.c_str());    
+    
+    infoWidth += (u8g2.getStrWidth(timeString.c_str()) + 6);
   }
 
-  // Battery Indicator
-  u8g2.drawXBMP(0,u8g2.getDisplayHeight()-6,10,6,batt_allArray[battState]);
+  // MSC Indicator
+  if (mscEnabled) {
+    u8g2.setFont(u8g2_font_5x7_tf);
+    u8g2.drawStr(infoWidth,u8g2.getDisplayHeight(),"USB");
+
+    infoWidth += (u8g2.getStrWidth("USB") + 6);
+  }
+
+  // SD Indicator
+  if (SDActive) {
+    u8g2.setFont(u8g2_font_5x7_tf);
+    u8g2.drawStr(infoWidth,u8g2.getDisplayHeight(),"SD");
+
+    infoWidth += (u8g2.getStrWidth("SD") + 6);
+  }
 }
 
 void oledScroll() {
