@@ -14,13 +14,12 @@
 #include <USBMSC.h>
 #include <SD_MMC.h>
 #include <Preferences.h>
+#include <stdint.h>
 #include "Adafruit_MPR121.h"
 #include "esp_cpu.h"
 #include "RTClib.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "FS.h"
-#include "SPIFFS.h"
 
 #include "assets.h"
 #include "config.h"
@@ -45,10 +44,7 @@
 
 // Display
 extern GxEPD2_BW<GxEPD2_310_GDEQ031T10, GxEPD2_310_GDEQ031T10::HEIGHT> display;
-//extern volatile bool useFastFullUpdate;
-//extern volatile bool GxEPD2_310_GDEQ031T10::useFastFullUpdate;
 extern U8G2_SSD1326_ER_256X32_F_4W_HW_SPI u8g2;           // 256x32 SPI OLED
-//extern U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2;       // 128x32 I2C OLED
 
 // Keypad
 extern Adafruit_TCA8418 keypad;
@@ -67,7 +63,10 @@ extern RTC_PCF8563 rtc;
 extern const char daysOfTheWeek[7][12];
 
 // USB
+#define ARDUINO_USB_MODE 1
 extern USBMSC msc;
+extern bool mscEnabled;
+extern sdmmc_card_t* card;
 
 // GENERAL
 
@@ -79,6 +78,9 @@ extern bool SYSTEM_CLOCK;      // Enable a small clock on the bottom of the scre
 extern bool SHOW_YEAR;         // Show the year on the clock
 extern bool SAVE_POWER;        // Enable a slower CPU clock speed to save battery with little cost to performance
 extern bool ALLOW_NO_MICROSD;  // Allow the device to operate with no SD card
+extern bool HOME_ON_BOOT;      // Always start the home app on boot
+extern int OLED_BRIGHTNESS;    // Brightness of the OLED (0-255)
+extern int OLED_MAX_FPS;       // Define the max oled FPS
 
 extern volatile int einkRefresh;
 extern int OLEDFPSMillis;
@@ -102,6 +104,7 @@ extern TaskHandle_t einkHandlerTaskHandle;
 extern char currentKB[4][10];
 extern volatile bool SDCARD_INSERT;
 extern bool noSD;
+extern volatile bool SDActive;
 
 enum KBState { NORMAL, SHIFT, FUNC };
 extern KBState CurrentKBState;
@@ -109,12 +112,12 @@ extern KBState CurrentKBState;
 extern uint8_t partialCounter;
 extern volatile bool forceSlowFullUpdate;
 
-enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS };
+enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
 extern const String appStateNames[];
-extern const unsigned char *appIcons[6];
+extern const unsigned char *appIcons[9];
 extern AppState CurrentAppState;
 
-// <TXT.ino>
+// <TXT.cpp>
 extern String currentWord;
 extern String allText;
 extern String prevAllText;
@@ -147,7 +150,7 @@ extern volatile long int prev_dynamicScroll;
 extern int lastTouch;
 extern unsigned long lastTouchTime;
 
-// <TASKS.ino>
+// <TASKS.cpp>
 extern std::vector<std::vector<String>> tasks;
 extern uint8_t selectedTask;
 enum TasksState { TASKS0, TASKS0_NEWTASK, TASKS1, TASKS1_EDITTASK };
@@ -157,57 +160,71 @@ extern uint8_t editTaskState;
 extern String newTaskName;
 extern String newTaskDueDate;
 
-// <HOME.ino>
+// <HOME.cpp>
 enum HOMEState { HOME_HOME, NOWLATER };
 extern HOMEState CurrentHOMEState;
 
-// <FILEWIZ.ino>
+// <FILEWIZ.cpp>
 enum FileWizState { WIZ0_, WIZ1_, WIZ1_YN, WIZ2_R, WIZ2_C, WIZ3_ };
 extern FileWizState CurrentFileWizState;
 extern String workingFile;
 
+// <settings.cpp>
+enum SettingsState { settings0, settings1 };
+extern SettingsState CurrentSettingsState;
+
+// <CALENDAR.cpp>
+enum CalendarState { WEEK, MONTH, NEW_EVENT, VIEW_EVENT, SUN, MON, TUE, WED, THU, FRI };
+extern CalendarState CurrentCalendarState;
+
+// <LEXICON.cpp>
+enum LexState {MENU, DEF};
+extern LexState CurrentLexState;
+
 // FUNCTION PROTOTYPES
-// <sysFunc.ino>
-  // SYSTEM
-  void checkTimeout();
-  void PWR_BTN_irq();
-  void TCA8418_irq();
-  char updateKeypress();
-  void printDebug();
-  String vectorToString();
-  void stringToVector(String inputText);
-  void saveFile();
-  void writeMetadata(const String& path);
-  void loadFile();
-  void delFile(String fileName);
-  void deleteMetadata(String path);
-  void renFile(String oldFile, String newFile);
-  void renMetadata(String oldPath, String newPath);
-  void copyFile(String oldFile, String newFile);
-  void updateBattState();
-  String removeChar(String str, char character);
-  void appendToFile(String path, String inText);
-  void setCpuSpeed(int newFreq);
-  void playJingle(String jingle);
-  void deepSleep(bool alternateScreenSaver = false);
+// <sysFunc.cpp>
+// SYSTEM
+void checkTimeout();
+void PWR_BTN_irq();
+void TCA8418_irq();
+char updateKeypress();
+void printDebug();
+String vectorToString();
+void stringToVector(String inputText);
+void saveFile();
+void writeMetadata(const String& path);
+void loadFile(bool showOLED = true);
+void delFile(String fileName);
+void deleteMetadata(String path);
+void renFile(String oldFile, String newFile);
+void renMetadata(String oldPath, String newPath);
+void copyFile(String oldFile, String newFile);
+void updateBattState();
+String removeChar(String str, char character);
+void appendToFile(String path, String inText);
+void setCpuSpeed(int newFreq);
+void playJingle(String jingle);
+void deepSleep(bool alternateScreenSaver = false);
+void loadState(bool changeState = true);
+int stringToInt(String str);
 
-  // microSD
-  void listDir(fs::FS &fs, const char *dirname);
-  void readFile(fs::FS &fs, const char *path);
-  String readFileToString(fs::FS &fs, const char *path);
-  void writeFile(fs::FS &fs, const char *path, const char *message);
-  void appendFile(fs::FS &fs, const char *path, const char *message);
-  void renameFile(fs::FS &fs, const char *path1, const char *path2);
-  void deleteFile(fs::FS &fs, const char *path);
-  void setTimeFromString(String timeStr);
+// microSD
+void listDir(fs::FS &fs, const char *dirname);
+void readFile(fs::FS &fs, const char *path);
+String readFileToString(fs::FS &fs, const char *path);
+void writeFile(fs::FS &fs, const char *path, const char *message);
+void appendFile(fs::FS &fs, const char *path, const char *message);
+void renameFile(fs::FS &fs, const char *path1, const char *path2);
+void deleteFile(fs::FS &fs, const char *path);
+void setTimeFromString(String timeStr);
 
-// <OLEDFunc.ino>
-void oledWord(String word);
+// <OLEDFunc.cpp>
+void oledWord(String word, bool allowLarge = false, bool showInfo = true);
 void oledLine(String line, bool doProgressBar = true);
 void oledScroll();
 void infoBar();
 
-// <einkFunc.ino>
+// <einkFunc.cpp>
 void refresh();
 void einkHandler(void *parameter);
 void statusBar(String input, bool fullWindow = false);
@@ -218,12 +235,15 @@ void einkTextDynamic(bool doFull_, bool noRefresh = false);
 void setTXTFont(const GFXfont *font);
 void setFastFullRefresh(bool setting);
 void drawStatusBar(String input);
+void multiPassRefesh(int passes);
 
-// <FILEWIZ.ino>
+// <FILEWIZ.cpp>
+void FILEWIZ_INIT();
 void processKB_FILEWIZ();
 void einkHandler_FILEWIZ();
 
-// <TXT.ino>
+// <TXT.cpp>
+void TXT_INIT();
 void processKB_TXT();
 void einkHandler_TXT();
 void processKB_TXT_NEW();
@@ -233,13 +253,14 @@ int countWords(String str);
 int countVisibleChars(String input);
 void updateScrollFromTouch();
 
-// <HOME.ino>
+// <HOME.cpp>
 void einkHandler_HOME();
 void processKB_HOME();
 void commandSelect(String command);
 void drawHome();
 
-// <TASKS.ino>
+// <TASKS.cpp>
+void TASKS_INIT();
 void sortTasksByDueDate(std::vector<std::vector<String>> &tasks);
 void addTask(String taskName, String dueDate, String priority, String completed);
 void updateTaskArray();
@@ -248,6 +269,33 @@ void deleteTask(int index);
 String convertDateFormat(String yyyymmdd);
 void einkHandler_TASKS();
 void processKB_TASKS();
+
+// <settings.cpp>
+void SETTINGS_INIT();
+void processKB_settings();
+void einkHandler_settings();
+void settingCommandSelect(String command);
+
+// <USB.cpp>
+void USB_INIT();
+static int32_t onWrite(uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize);
+static int32_t onRead(uint32_t lba, uint32_t offset, void *buffer, uint32_t bufsize);
+static bool onStartStop(uint8_t, bool start, bool eject);
+static void usbEventCallback(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+void processKB_USB();
+void einkHandler_USB();
+void USBAppSetup();
+
+// <CALENDAR.cpp>
+void CALENDAR_INIT();
+void processKB_CALENDAR();
+void einkHandler_CALENDAR();
+
+// <LEXICON.cpp>
+void LEXICON_INIT();
+void processKB_LEXICON();
+void einkHandler_LEXICON();
+
 
 // <PocketMage>
 void applicationEinkHandler();

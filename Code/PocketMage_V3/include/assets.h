@@ -30,8 +30,10 @@ extern const unsigned char _homeIcons3 [] PROGMEM;
 extern const unsigned char _homeIcons4 [] PROGMEM;
 extern const unsigned char _homeIcons5 [] PROGMEM;
 extern const unsigned char _homeIcons6 [] PROGMEM;
-extern const int _allArray_LEN;
-extern const unsigned char* homeIconsAllArray[5];
+extern const unsigned char _homeIcons7 [] PROGMEM;
+extern const unsigned char _homeIcons8 [] PROGMEM;
+extern const unsigned char _homeIcons9 [] PROGMEM;
+extern const unsigned char* homeIconsAllArray[8];
 
 //
 extern const unsigned char fileWizardfileWiz0 [] PROGMEM;
@@ -103,5 +105,40 @@ extern const unsigned char _batt3 [] PROGMEM;
 extern const unsigned char _batt4 [] PROGMEM;
 extern const unsigned char _batt5 [] PROGMEM;
 extern const unsigned char* batt_allArray[6];
+
+//
+extern const unsigned char _settings [] PROGMEM;
+
+//
+extern const unsigned char _toggle [] PROGMEM;
+extern const unsigned char _toggleON [] PROGMEM;
+extern const unsigned char _toggleOFF [] PROGMEM;
+
+//
+extern const unsigned char _calendar00 [] PROGMEM;
+extern const unsigned char _calendar01 [] PROGMEM;
+extern const unsigned char _calendar02 [] PROGMEM;
+extern const unsigned char _calendar03 [] PROGMEM;
+extern const unsigned char _calendar04 [] PROGMEM;
+extern const unsigned char _calendar05 [] PROGMEM;
+extern const unsigned char _calendar06 [] PROGMEM;
+extern const unsigned char _calendar07 [] PROGMEM;
+extern const unsigned char _calendar08 [] PROGMEM;
+extern const unsigned char _calendar09 [] PROGMEM;
+extern const unsigned char _calendar10 [] PROGMEM;
+extern const unsigned char* calendar_allArray[11];
+
+//
+extern const unsigned char _lex0 [] PROGMEM;
+extern const unsigned char _lex1 [] PROGMEM;
+extern const unsigned char* lex_allArray[2];
+
+//
+extern const unsigned char _usb [] PROGMEM;
+
+//
+extern const unsigned char _eventMarker0 [] PROGMEM;
+extern const unsigned char _eventMarker1 [] PROGMEM;
+
 
 #endif
