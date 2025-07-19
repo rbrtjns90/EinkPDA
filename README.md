@@ -16,8 +16,7 @@
 
 # [TO-DO]
 - Calendar app
-- Plugging in a USB automatically backs up the files
-- Transfer to/from PC via USB
+- Journal app
 - Bluetooth keyboard support
 
 # License
