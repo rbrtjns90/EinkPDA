@@ -15,6 +15,7 @@ void saveFile() {
     return;
   }
   else {
+    SDActive = true;
     setCpuFrequencyMhz(240);
     delay(50);
 
@@ -35,7 +36,8 @@ void saveFile() {
     
     delay(1000);
     keypad.enableInterrupts();
-    if (SAVE_POWER) setCpuFrequencyMhz(40);
+    if (SAVE_POWER) setCpuFrequencyMhz(POWER_SAVE_FREQ);
+    SDActive = false;
   }
 }
 
@@ -103,18 +105,19 @@ void writeMetadata(const String& path) {
   Serial.println("Metadata updated.");
 }
 
-void loadFile() {
+void loadFile(bool showOLED) {
   if (noSD) {
     oledWord("LOAD FAILED - No SD!");
     delay(5000);
     return;
   }
   else {
+    SDActive = true;
     setCpuFrequencyMhz(240);
     delay(50);
 
     keypad.disableInterrupts();
-    oledWord("Loading File");
+    if (showOLED) oledWord("Loading File");
     if (!editingFile.startsWith("/")) editingFile = "/" + editingFile;
     String textToLoad = readFileToString(SD_MMC, (editingFile).c_str());
     if (DEBUG_VERBOSE) {
@@ -123,9 +126,10 @@ void loadFile() {
     }
     stringToVector(textToLoad);
     keypad.enableInterrupts();
-    oledWord("File Loaded");
+    if (showOLED) oledWord("File Loaded");
     delay(200);
-    if (SAVE_POWER) setCpuFrequencyMhz(40);
+    if (SAVE_POWER) setCpuFrequencyMhz(POWER_SAVE_FREQ);
+    SDActive = false;
   }
 }
 
@@ -136,6 +140,7 @@ void delFile(String fileName) {
     return;
   }
   else {
+    SDActive = true;
     setCpuFrequencyMhz(240);
     delay(50);
 
@@ -150,7 +155,8 @@ void delFile(String fileName) {
 
     delay(1000);
     keypad.enableInterrupts();
-    if (SAVE_POWER) setCpuFrequencyMhz(40);
+    if (SAVE_POWER) setCpuFrequencyMhz(POWER_SAVE_FREQ);
+    SDActive = false;
   }
 }
 
@@ -200,6 +206,7 @@ void renFile(String oldFile, String newFile) {
     return;
   }
   else {
+    SDActive = true;
     setCpuFrequencyMhz(240);
     delay(50);
 
@@ -215,7 +222,8 @@ void renFile(String oldFile, String newFile) {
     renMetadata(oldFile, newFile);
 
     keypad.enableInterrupts();
-    if (SAVE_POWER) setCpuFrequencyMhz(40);
+    if (SAVE_POWER) setCpuFrequencyMhz(POWER_SAVE_FREQ);
+    SDActive = false;
   }
 }
 
@@ -277,6 +285,7 @@ void copyFile(String oldFile, String newFile) {
     return;
   }
   else {
+    SDActive = true;
     setCpuFrequencyMhz(240);
     delay(50);
 
@@ -294,7 +303,8 @@ void copyFile(String oldFile, String newFile) {
     delay(1000);
     keypad.enableInterrupts();
 
-    if (SAVE_POWER) setCpuFrequencyMhz(40);
+    if (SAVE_POWER) setCpuFrequencyMhz(POWER_SAVE_FREQ);
+    SDActive = false;
   }
 }
 
@@ -305,6 +315,7 @@ void appendToFile(String path, String inText) {
     return;
   }
   else {
+    SDActive = true;
     setCpuFrequencyMhz(240);
     delay(50);
 
@@ -316,7 +327,8 @@ void appendToFile(String path, String inText) {
 
     keypad.enableInterrupts();
 
-    if (SAVE_POWER) setCpuFrequencyMhz(40);
+    if (SAVE_POWER) setCpuFrequencyMhz(POWER_SAVE_FREQ);
+    SDActive = false;
   }
 }
 
@@ -493,14 +505,29 @@ void setTimeFromString(String timeStr) {
     int minutes = timeStr.substring(3, 5).toInt();
 
     if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-        Serial.println("Invalid time values!");
-        return;
+      oledWord("Invalid");
+      delay(500);
+      return;
     }
 
     DateTime now = rtc.now();  // Get current date
     rtc.adjust(DateTime(now.year(), now.month(), now.day(), hours, minutes, 0));
 
     Serial.println("Time updated!");
+}
+
+int stringToInt(String str) {
+  str.trim(); // Remove leading/trailing whitespace
+
+  if (str.length() == 0) return -1;
+
+  for (int i = 0; i < str.length(); i++) {
+    if (!isDigit(str.charAt(i))) {
+      return -1; // Invalid character found
+    }
+  }
+
+  return str.toInt(); // Safe to convert
 }
 
 // Misc Outputs
@@ -680,6 +707,12 @@ void checkTimeout() {
     }
     
     if (digitalRead(CHRG_SENS) == HIGH) {
+      // Save last state
+      prefs.begin("PocketMage", false);
+      prefs.putInt("CurrentAppState", static_cast<int>(CurrentAppState));
+      prefs.putString("editingFile", editingFile);
+      prefs.end();
+
       CurrentAppState = HOME;
       CurrentHOMEState = NOWLATER;
       updateTaskArray();
@@ -702,18 +735,6 @@ void checkTimeout() {
       switch (CurrentAppState) {
         case TXT:
           if (SLEEPMODE == "TEXT" && editingFile != "") {
-            // Put OLED to sleep
-            u8g2.setPowerSave(1);
-
-            // Stop the einkHandler task
-            if (einkHandlerTaskHandle != NULL) {
-              vTaskDelete(einkHandlerTaskHandle);
-              einkHandlerTaskHandle = NULL;
-            }
-
-            // Shutdown Jingle
-            playJingle("shutdown");
-
             prevAllText = allText;
             einkRefresh = FULL_REFRESH_AFTER + 1;
             display.setFullWindow();
@@ -731,12 +752,7 @@ void checkTimeout() {
             display.fillRect(320-86, 240-52, 87, 52, GxEPD_WHITE);
             display.drawBitmap(320-86, 240-52, sleep1, 87, 52, GxEPD_BLACK);
 
-            forceSlowFullUpdate = true;
-            refresh();
-            display.hibernate();
-            
-            // Sleep the device
-            esp_deep_sleep_start();
+            deepSleep(true);
           }
           // Sleep device normally
           else deepSleep();
@@ -749,7 +765,15 @@ void checkTimeout() {
     
   }
   else if (PWR_BTN_event && CurrentHOMEState == NOWLATER) {
-    CurrentAppState = HOME;
+    // Load last state
+    /*prefs.begin("PocketMage", true);
+    editingFile = prefs.getString("editingFile", "");
+    if (HOME_ON_BOOT) CurrentAppState = HOME;
+    else CurrentAppState = static_cast<AppState>(prefs.getInt("CurrentAppState", HOME));
+    prefs.end();*/
+    loadState();
+    keypad.flush();
+
     CurrentHOMEState = HOME_HOME;
     PWR_BTN_event = false;
     if (OLEDPowerSave) {
@@ -782,44 +806,96 @@ void deepSleep(bool alternateScreenSaver) {
   playJingle("shutdown");
 
   if (alternateScreenSaver == false) {
-    /*
-    display.setFullWindow();
-    // Choose a random screensaver
-    int randomScreenSaver_ = random(0, sizeof(ScreenSaver_allArray) / sizeof(ScreenSaver_allArray[0]));
-    display.drawBitmap(0, 0, ScreenSaver_allArray[randomScreenSaver_], 320, 240, GxEPD_BLACK);
-    forceSlowFullUpdate = true;
-    */
-
-    /*DateTime now = rtc.now();
-    randomSeed(analogRead(BAT_SENS) * now.second());
-    int randomScreenSaver_ = random(0, sizeof(ScreenSaver_allArray) / sizeof(ScreenSaver_allArray[0])); */
-
     int numScreensavers = sizeof(ScreenSaver_allArray) / sizeof(ScreenSaver_allArray[0]);
     int randomScreenSaver_ = esp_random() % numScreensavers;
 
     //display.setPartialWindow(0, 0, 320, 60);
     display.setFullWindow();
     display.drawBitmap(0, 0, ScreenSaver_allArray[randomScreenSaver_], 320, 240, GxEPD_BLACK);
-    display.display(false);
-    delay(250);
-    display.display(true);
-    delay(250);
-    display.display(true);
-    delay(250);
-    display.display(true);
-    delay(100);
+    multiPassRefesh(2);
   }
   else {
     // Display alternate screensaver
+    forceSlowFullUpdate = true;
     refresh();
     delay(100);
   }
 
   // Put E-Ink to sleep
   display.hibernate();
+
+  // Save last state
+  prefs.begin("PocketMage", false);
+  prefs.putInt("CurrentAppState", static_cast<int>(CurrentAppState));
+  prefs.putString("editingFile", editingFile);
+  prefs.end();
       
   // Sleep the ESP32
   esp_deep_sleep_start();
+}
+
+void loadState(bool changeState) {
+  // LOAD PREFERENCES
+  prefs.begin("PocketMage", true); // Read-Only
+  // Misc
+  TIMEOUT           = prefs.getInt("TIMEOUT", 120);
+  DEBUG_VERBOSE     = prefs.getBool("DEBUG_VERBOSE", true);
+  SYSTEM_CLOCK      = prefs.getBool("SYSTEM_CLOCK", true);
+  SHOW_YEAR         = prefs.getBool("SHOW_YEAR", true);
+  SAVE_POWER        = prefs.getBool("SAVE_POWER", true);
+  ALLOW_NO_MICROSD  = prefs.getBool("ALLOW_NO_SD", false);
+  editingFile       = prefs.getString("editingFile", "");
+  HOME_ON_BOOT      = prefs.getBool("HOME_ON_BOOT", false);
+  OLED_BRIGHTNESS   = prefs.getInt("OLED_BRIGHTNESS", 255);
+  OLED_MAX_FPS      = prefs.getInt("OLED_MAX_FPS", 30);
+
+  // Update State (if needed)
+  if (changeState) {
+    u8g2.setContrast(OLED_BRIGHTNESS);
+
+    if (HOME_ON_BOOT) CurrentAppState = HOME;
+    else CurrentAppState = static_cast<AppState>(prefs.getInt("CurrentAppState", HOME));
+    
+    keypad.flush();
+
+    // Initialize boot app if needed
+    switch (CurrentAppState) {
+      case HOME:
+        newState = true;
+        break;
+      case TXT:
+        if (editingFile != "") loadFile(false);
+        else {
+          stringToVector("");
+        }
+        CurrentKBState  = NORMAL;
+        dynamicScroll = 0;
+        newLineAdded = true;
+        newState = false;
+        break;
+      case SETTINGS:
+        newState = true;
+        break;
+      case TASKS:
+        CurrentTasksState = TASKS0;
+        forceSlowFullUpdate = true;
+        newState = true;
+        break;
+      case USB_APP:
+        CurrentAppState = HOME;
+        CurrentKBState  = NORMAL;
+        newState = true;
+        break;
+      case CALENDAR:
+        CALENDAR_INIT();
+        break;
+      case LEXICON:
+        LEXICON_INIT();
+        break;
+    }
+  }
+
+  prefs.end();
 }
 
 // Low-Level SDMMC Operations

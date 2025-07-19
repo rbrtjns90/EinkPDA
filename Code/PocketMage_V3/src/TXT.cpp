@@ -7,9 +7,17 @@
 //      o888o     o888o  o88888o     o888o      //
 #include "globals.h"
 
+void TXT_INIT() {
+  if (editingFile != "") loadFile();
+  CurrentAppState = TXT;
+  CurrentKBState  = NORMAL;
+  dynamicScroll = 0;
+  newLineAdded = true;
+}
+
 // OLD MAINS
 void processKB_TXT() {
-  if (OLEDPowerSave) {
+  /*if (OLEDPowerSave) {
     u8g2.setPowerSave(0);
     OLEDPowerSave = false;
   }
@@ -376,11 +384,11 @@ void processKB_TXT() {
 
     }
     KBBounceMillis = currentMillis;
-  }
+  }*/
 }
 
 void einkHandler_TXT() {
-  if ((prevAllText != allText) || newState) {
+  /*if ((prevAllText != allText) || newState) {
     newState = false;
     switch (CurrentTXTState) {
       case TXT_:
@@ -473,7 +481,7 @@ void einkHandler_TXT() {
         CurrentKBState = NORMAL;
         break;
     }
-  }
+  }*/
 }
 
 // NEW MAINS
@@ -486,7 +494,6 @@ void processKB_TXT_NEW() {
   disableTimeout = false;
 
   int currentMillis = millis();
-  //Make sure oled only updates at 60fps
   if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
     char inchar = updateKeypress();
     switch (CurrentTXTState) {
@@ -598,7 +605,7 @@ void processKB_TXT_NEW() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/60)) {
           OLEDFPSMillis = currentMillis;
           // ONLY SHOW OLEDLINE WHEN NOT IN SCROLL MODE
           if (lastTouch == -1) {
@@ -627,6 +634,7 @@ void processKB_TXT_NEW() {
               if (lastSpace != -1) {
                 partialWord = currentLine.substring(lastSpace + 1);
                 currentLine = currentLine.substring(0, lastSpace);  // Strip partial word
+                allLines.push_back(currentLine);
                 currentLine = partialWord;  // Start new line with the partial word
               } 
               // No spaces found, whole line is a single word
@@ -687,7 +695,7 @@ void processKB_TXT_NEW() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledLine(currentWord, false);
         }
@@ -751,7 +759,7 @@ void processKB_TXT_NEW() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledLine(currentWord, false);
         }
@@ -816,7 +824,7 @@ void processKB_TXT_NEW() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledLine(currentWord, false);
         }
@@ -873,7 +881,7 @@ void processKB_TXT_NEW() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledLine(currentWord, false);
         }
@@ -935,7 +943,7 @@ void processKB_TXT_NEW() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledLine(currentWord, false);
         }
@@ -1219,6 +1227,7 @@ void updateScrollFromTouch() {
   unsigned long currentTime = millis();
 
   if (newTouch != -1) {  // If a touch is detected
+    Serial.println("Touch Detected");
     if (lastTouch != -1) {  // Compare with previous touch
       int touchDelta = abs(newTouch - lastTouch);
       if (touchDelta <= 2) {  // Ignore large jumps (adjust threshold if needed)

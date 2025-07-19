@@ -7,6 +7,13 @@
 //     o888o     o88o     o8888o 8""88888P'  o888o  o888o 8""88888P'  //  
 #include "globals.h"                                                 
 
+void TASKS_INIT() {
+  CurrentAppState = TASKS;
+  CurrentTasksState = TASKS0;
+  forceSlowFullUpdate = true;
+  newState = true;
+}
+
 void sortTasksByDueDate(std::vector<std::vector<String>> &tasks) {
   std::sort(tasks.begin(), tasks.end(), [](const std::vector<String> &a, const std::vector<String> &b) {
     return a[1] < b[1]; // Compare dueDate strings
@@ -22,7 +29,10 @@ void addTask(String taskName, String dueDate, String priority, String completed)
 }
 
 void updateTaskArray() {
-  File file = SPIFFS.open("/tasks.txt", "r"); // Open the text file in read mode
+  SDActive = true;
+  setCpuFrequencyMhz(240);
+  delay(50);
+  File file = SD_MMC.open("/sys/tasks.txt", "r"); // Open the text file in read mode
   if (!file) {
     Serial.println("Failed to open file for reading");
     return;
@@ -56,11 +66,17 @@ void updateTaskArray() {
   }
 
   file.close();  // Close the file
+
+  if (SAVE_POWER) setCpuFrequencyMhz(POWER_SAVE_FREQ);
+  SDActive = false;
 }
 
 void updateTasksFile() {
+  SDActive = true;
+  setCpuFrequencyMhz(240);
+  delay(50);
   // Clear the existing tasks file first
-  delFile("/tasks.txt");
+  delFile("/sys/tasks.txt");
 
   // Iterate through the tasks vector and append each task to the file
   for (size_t i = 0; i < tasks.size(); i++) {
@@ -68,8 +84,11 @@ void updateTasksFile() {
     String taskInfo = tasks[i][0] + "|" + tasks[i][1] + "|" + tasks[i][2] + "|" + tasks[i][3];
     
     // Append the task info to the file
-    appendToFile("/tasks.txt", taskInfo);
+    appendToFile("/sys/tasks.txt", taskInfo);
   }
+
+  if (SAVE_POWER) setCpuFrequencyMhz(POWER_SAVE_FREQ);
+  SDActive = false;
 }
 
 void deleteTask(int index) {
@@ -103,7 +122,7 @@ void processKB_TASKS() {
   switch (CurrentTasksState) {
     case TASKS0:
       CurrentKBState = FUNC;
-      //Make sure oled only updates at 60fps
+      //Make keyboard only updates after cooldown
       if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
         inchar = updateKeypress();
         //No char recieved
@@ -141,7 +160,7 @@ void processKB_TASKS() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledWord(currentWord);
         }
@@ -227,7 +246,7 @@ void processKB_TASKS() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledLine(currentLine, false);
         }
@@ -274,7 +293,7 @@ void processKB_TASKS() {
 
         currentMillis = millis();
         //Make sure oled only updates at 60fps
-        if (currentMillis - OLEDFPSMillis >= 16) {
+        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
           oledWord(currentWord);
         }
