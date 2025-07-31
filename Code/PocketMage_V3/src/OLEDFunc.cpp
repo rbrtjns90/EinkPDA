@@ -63,7 +63,7 @@ void oledWord(String word, bool allowLarge, bool showInfo) {
   
 }
 
-void oledLine(String line, bool doProgressBar) {
+void oledLine(String line, bool doProgressBar, String bottomMsg) {
   uint8_t maxLength = maxCharsPerLine;
   u8g2.clearBuffer();
   
@@ -93,10 +93,42 @@ void oledLine(String line, bool doProgressBar) {
     }
   }
 
-  // DRAW FN/SHIFT IF NEEDED
-  //u8g2.setFont(u8g2_font_u8glib_4_tf);
-  u8g2.setFont(u8g2_font_5x7_tf);
+  // No bottom msg, show infobar
+  if (bottomMsg == "") infoBar();
+  // Display bottomMsg
+  else {
+    u8g2.setFont(u8g2_font_5x7_tf);
+    u8g2.drawStr(0, u8g2.getDisplayHeight(), bottomMsg.c_str());
 
+    // Draw FN/Shift indicator
+    u8g2.setFont(u8g2_font_5x7_tf);
+    switch (CurrentKBState) {
+      case SHIFT:
+        u8g2.drawStr((u8g2.getDisplayWidth() - u8g2.getStrWidth("SHIFT")), u8g2.getDisplayHeight(), "SHIFT");
+        break;
+      case FUNC:
+        u8g2.drawStr((u8g2.getDisplayWidth() - u8g2.getStrWidth("FN")), u8g2.getDisplayHeight(), "FN");
+        break;
+    }
+  }
+
+  // DRAW LINE TEXT
+  u8g2.setFont(u8g2_font_ncenB18_tr);
+  if (u8g2.getStrWidth(line.c_str()) < (u8g2.getDisplayWidth() - 5)) {
+    u8g2.drawStr(0,20,line.c_str());
+    if (line.length() > 0) u8g2.drawVLine(u8g2.getStrWidth(line.c_str()) + 2, 1, 22);
+  }
+  // Draw position indicator
+  else {
+    u8g2.drawStr(u8g2.getDisplayWidth()-8-u8g2.getStrWidth(line.c_str()),20,line.c_str());
+  }
+
+  u8g2.sendBuffer();
+}
+
+void infoBar() {
+  // Draw FN/Shift indicator
+  u8g2.setFont(u8g2_font_5x7_tf);
   switch (CurrentKBState) {
     case SHIFT:
       u8g2.drawStr((u8g2.getDisplayWidth() - u8g2.getStrWidth("SHIFT")) / 2, u8g2.getDisplayHeight(), "SHIFT");
@@ -106,21 +138,6 @@ void oledLine(String line, bool doProgressBar) {
       break;
   }
 
-  infoBar();
-
-  // DRAW LINE TEXT
-  u8g2.setFont(u8g2_font_ncenB18_tr);
-  if (u8g2.getStrWidth(line.c_str()) < (u8g2.getDisplayWidth() - 5)) {
-    u8g2.drawStr(0,20,line.c_str());
-  }
-  else {
-    u8g2.drawStr(u8g2.getDisplayWidth()-8-u8g2.getStrWidth(line.c_str()),20,line.c_str());
-  }
-
-  u8g2.sendBuffer();
-}
-
-void infoBar() {
   int infoWidth = 16;
 
   // Battery Indicator
