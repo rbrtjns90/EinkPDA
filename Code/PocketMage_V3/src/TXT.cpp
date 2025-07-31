@@ -966,14 +966,6 @@ void einkHandler_TXT_NEW() {
           einkTextDynamic(true);
           refresh();
         }
-        /*else if (newState && !newLineAdded) {
-          display.setPartialWindow(0,display.height()-20,display.width(),20);
-          drawStatusBar("L:" + String(allLines.size()) + "," + editingFile);
-          refresh();
-        }*/
-        
-        //einkTextDynamic(true);
-
         break;
       case WIZ0:
         display.setFullWindow();
