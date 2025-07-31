@@ -45,6 +45,9 @@ void applicationEinkHandler() {
     case LEXICON:
       einkHandler_LEXICON();
       break;
+    case JOURNAL:
+      einkHandler_JOURNAL();
+      break;
     // ADD APP CASES HERE
     default:
       einkHandler_HOME();
@@ -85,6 +88,9 @@ void processKB() {
       break;
     case LEXICON:
       processKB_LEXICON();
+      break;
+    case JOURNAL:
+      processKB_JOURNAL();
       break;
     // ADD APP CASES HERE
     default:
@@ -161,6 +167,7 @@ void setup() {
     }
   }
 
+  setCpuFrequencyMhz(240);
   // Create folders and files if needed
   if (!SD_MMC.exists("/sys"))     SD_MMC.mkdir("/sys");
   if (!SD_MMC.exists("/journal")) SD_MMC.mkdir("/journal");
