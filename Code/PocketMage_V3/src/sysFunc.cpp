@@ -892,6 +892,9 @@ void loadState(bool changeState) {
       case LEXICON:
         LEXICON_INIT();
         break;
+      case JOURNAL:
+        JOURNAL_INIT();
+        break;
     }
   }
 
