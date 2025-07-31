@@ -13,8 +13,23 @@ void settingCommandSelect(String command) {
   command.toLowerCase();
 
   if (command.startsWith("timeset ")) {
-    String timePart = command.substring(8);  // Skip "timeset "
+    String timePart = command.substring(8);
     setTimeFromString(timePart);
+    return;
+  }
+  else if (command.startsWith("dateset ")) {
+    String datePart = command.substring(8);
+    if (datePart.length() == 8 && datePart.toInt() > 0) {
+      int year  = datePart.substring(0, 4).toInt();
+      int month = datePart.substring(4, 6).toInt();
+      int day   = datePart.substring(6, 8).toInt();
+
+      DateTime now = rtc.now();  // Preserve current time
+      rtc.adjust(DateTime(year, month, day, now.hour(), now.minute(), now.second()));
+    } else {
+      oledWord("Invalid format (use YYYYMMDD)");
+      delay(2000);
+    }
     return;
   }
   else if (command.startsWith("lumina ")) {
