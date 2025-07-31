@@ -25,6 +25,11 @@
 #include "config.h"
 
 // FONTS
+// 3x7
+#include "Fonts/Font3x7FixedNum.h"
+#include "Fonts/Font4x5Fixed.h"
+#include "Fonts/Font5x7Fixed.h"
+
 // 9x7
 #include <Fonts/FreeMonoBold9pt7b.h>
 #include <Fonts/FreeSans9pt7b.h>
@@ -174,12 +179,17 @@ enum SettingsState { settings0, settings1 };
 extern SettingsState CurrentSettingsState;
 
 // <CALENDAR.cpp>
-enum CalendarState { WEEK, MONTH, NEW_EVENT, VIEW_EVENT, SUN, MON, TUE, WED, THU, FRI };
+enum CalendarState { WEEK, MONTH, NEW_EVENT, VIEW_EVENT, SUN, MON, TUE, WED, THU, FRI, SAT };
 extern CalendarState CurrentCalendarState;
 
 // <LEXICON.cpp>
 enum LexState {MENU, DEF};
 extern LexState CurrentLexState;
+
+// <JOURNAL.cpp>
+enum JournalState {J_MENU, J_TXT};
+extern JournalState CurrentJournalState;
+
 
 // FUNCTION PROTOTYPES
 // <sysFunc.cpp>
@@ -220,7 +230,7 @@ void setTimeFromString(String timeStr);
 
 // <OLEDFunc.cpp>
 void oledWord(String word, bool allowLarge = false, bool showInfo = true);
-void oledLine(String line, bool doProgressBar = true);
+void oledLine(String line, bool doProgressBar = true, String bottomMsg = "");
 void oledScroll();
 void infoBar();
 
@@ -296,6 +306,10 @@ void LEXICON_INIT();
 void processKB_LEXICON();
 void einkHandler_LEXICON();
 
+// <JOURNAL.cpp>
+void JOURNAL_INIT();
+void processKB_JOURNAL();
+void einkHandler_JOURNAL();
 
 // <PocketMage>
 void applicationEinkHandler();

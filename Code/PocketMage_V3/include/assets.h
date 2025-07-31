@@ -140,5 +140,10 @@ extern const unsigned char _usb [] PROGMEM;
 extern const unsigned char _eventMarker0 [] PROGMEM;
 extern const unsigned char _eventMarker1 [] PROGMEM;
 
+//
+extern const unsigned char _journal [] PROGMEM;
+
+
+
 
 #endif
