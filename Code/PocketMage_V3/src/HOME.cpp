@@ -55,17 +55,27 @@ void commandSelect(String command) {
     }
   }
 
-  if (command.startsWith("timeset")) {
-    command = removeChar(command, ' ');
-    command = removeChar(command, 't');
-    command = removeChar(command, 'i');
-    command = removeChar(command, 'm');
-    command = removeChar(command, 'e');
-    command = removeChar(command, 's');
-
-    setTimeFromString(command);
+  // Dice Roll
+  if (command.startsWith("roll d")) {
+    String numStr = command.substring(6);
+    int sides = numStr.toInt();
+    if (sides < 1) {
+      oledWord("Please enter a valid number");
+      delay(2000);
+    } 
+    else if (sides == 1) {
+      oledWord("D1: you rolled a 1, duh!");
+      delay(2000);
+    }
+    else {
+      int roll = (esp_random() % sides) + 1;
+      if (roll == sides)  oledWord("D" + String(sides) + ": " + String(roll) + "!!!");
+      else if (roll == 1) oledWord("D" + String(sides) + ": " + String(roll) + " :(");
+      else                oledWord("D" + String(sides) + ": " + String(roll));
+      delay(3000);
+      CurrentKBState = NORMAL;
+    }
   }
-
 
   else if (command == "home") {
     oledWord("You're home, silly!");
@@ -100,6 +110,9 @@ void commandSelect(String command) {
   }
   else if (command == "lex" || command == "lexicon" || command == "dict" || command == "dictionary" || command == "9") {
     LEXICON_INIT();
+  }
+  else if (command == "journ" || command == "journal" || command == "daily" || command == "8") {
+    JOURNAL_INIT();
   }
   /////////////////////////////
   else if (command == "i farted") {
@@ -163,6 +176,13 @@ void processKB_HOME() {
         //Space Recieved
         else if (inchar == 32) {                                  
           currentLine += " ";
+        }
+        // Home recieved
+        else if (inchar == 12) {
+          CurrentAppState = HOME;
+          currentLine     = "";
+          newState        = true;
+          CurrentKBState  = NORMAL;
         }
         //ESC / CLEAR Recieved
         else if (inchar == 20) {                                  
