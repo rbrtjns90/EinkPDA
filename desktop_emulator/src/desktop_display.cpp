@@ -239,21 +239,29 @@ void DesktopDisplay::einkDrawRect(int x, int y, int w, int h, bool filled, bool 
 }
 
 void DesktopDisplay::einkDrawBitmap(int x, int y, const unsigned char* bitmap, int w, int h, bool black) {
-    if (!bitmap) return;
+    if (!bitmap) {
+        std::cout << "[BITMAP] Error: bitmap is null" << std::endl;
+        return;
+    }
+    
+    std::cout << "[BITMAP] Drawing " << w << "x" << h << " bitmap at (" << x << "," << y << ")" << std::endl;
     
     int byteWidth = (w + 7) / 8; // Bitmap width in bytes
+    int pixelsDrawn = 0;
     
     for (int dy = 0; dy < h; dy++) {
         for (int dx = 0; dx < w; dx++) {
             int byteIndex = dy * byteWidth + dx / 8;
-            int bitIndex = 7 - (dx % 8);
-            
+            int bitIndex = 7 - (dx % 8); // MSB first bit order
             bool pixelOn = (bitmap[byteIndex] >> bitIndex) & 1;
             if (pixelOn) {
                 einkSetPixel(x + dx, y + dy, black);
+                pixelsDrawn++;
             }
         }
     }
+    
+    std::cout << "[BITMAP] Drew " << pixelsDrawn << " pixels" << std::endl;
 }
 
 void DesktopDisplay::einkDrawCircle(int x, int y, int r, bool filled, bool black) {

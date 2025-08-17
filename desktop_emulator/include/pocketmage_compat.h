@@ -503,7 +503,9 @@ public:
     }
     void drawBitmap(int x, int y, const uint8_t* bitmap, int w, int h, uint16_t color) {
         if (g_display && bitmap) {
-            g_display->einkDrawBitmap(x, y, bitmap, w, h, color == GxEPD_BLACK);
+            std::cout << "[BITMAP] Drawing bitmap at (" << x << "," << y << ") size " << w << "x" << h 
+                      << " color=" << (color == GxEPD_BLACK ? "BLACK" : "WHITE") << std::endl;
+            g_display->einkDrawBitmap(x, y, (const unsigned char*)bitmap, w, h, color == GxEPD_BLACK);
         }
     }
     void drawPixel(int x, int y, uint16_t color) {
