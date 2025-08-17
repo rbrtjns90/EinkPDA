@@ -164,6 +164,13 @@ bool keyboardInputAvailable = false;
 // Forward declarations
 void applicationEinkHandler();
 void processKB();
+void processKB_FILEWIZ();
+void processKB_TASKS();
+void processKB_CALENDAR();
+void processKB_SETTINGS();
+void processKB_USB();
+void processKB_JOURNAL();
+void processKB_LEXICON();
 
 char updateKeypress() {
     if (!g_display) return 0;
@@ -218,28 +225,53 @@ void printDebug() {
     }
 }
 
-// Enhanced app functions showing PocketMage-style interface
-void einkHandler_HOME() {
+// Real PocketMage home screen implementation
+int selectedApp = 0;
+const int totalApps = 9;
+
+void drawHome() {
     if (!g_display) return;
     
     g_display->einkClear();
     
-    // Draw title bar
-    g_display->einkDrawRect(0, 0, 310, 20, true, true);
-    g_display->einkDrawText("PocketMage V3", 10, 5);
+    // Draw app grid similar to real PocketMage
+    int appsPerRow = 5;
+    int spacingX = 60;
+    int spacingY = 60;
+    int iconSize = 40;
+    int startX = 20;
+    int startY = 20;
     
-    // Draw app icons/menu
-    g_display->einkDrawText("Applications:", 10, 30);
-    g_display->einkDrawText("> Text Editor", 20, 50);
-    g_display->einkDrawText("  File Manager", 20, 65);
-    g_display->einkDrawText("  Tasks", 20, 80);
-    g_display->einkDrawText("  Calendar", 20, 95);
-    g_display->einkDrawText("  Settings", 20, 110);
+    const String appStateNames[] = { "HOME", "TXT", "FILEWIZ", "USB", "BT", "SETTINGS", "TASKS", "CALENDAR", "JOURNAL", "LEXICON" };
+const char* appNames[] = {"TXT", "FILEWIZ", "USB", "BT", "SET", "TASKS", "CAL", "JOURNAL", "LEX"};
     
-    // Draw selection indicator
-    g_display->einkDrawText("*", 10, 50);
+    for (int i = 0; i < totalApps; i++) {
+        int row = i / appsPerRow;
+        int col = i % appsPerRow;
+        
+        int xPos = startX + (spacingX * col);
+        int yPos = startY + (spacingY * row);
+        
+        // Draw app icon (simplified rectangle)
+        g_display->einkDrawRect(xPos, yPos, iconSize, iconSize, false, true);
+        
+        // Highlight selected app
+        if (i == selectedApp) {
+            g_display->einkDrawRect(xPos-2, yPos-2, iconSize+4, iconSize+4, false, true);
+        }
+        
+        // Draw app name
+        g_display->einkDrawText(appNames[i], xPos + 5, yPos + iconSize + 15);
+    }
     
     g_display->einkRefresh();
+}
+
+void einkHandler_HOME() {
+    if (newState) {
+        newState = false;
+        drawHome();
+    }
 }
 
 void processKB_HOME() {
@@ -251,25 +283,39 @@ void processKB_HOME() {
         if (g_display) {
             g_display->oledClear();
             g_display->oledDrawText("PocketMage V3 - Battery: 100%", 5, 5);
-            g_display->oledDrawText("Key: " + std::string(1, key) + " | Apps: 5", 5, 20);
+            g_display->oledDrawText("App: " + std::to_string(selectedApp + 1) + "/5", 5, 20);
             g_display->oledUpdate();
         }
         
-        // Handle navigation
+        // Handle navigation with actual app selection
         switch (key) {
-            case 'U': // Up arrow
-                std::cout << "[Navigation] Up - Previous app" << std::endl;
+            case 'L': // Left arrow
+                selectedApp = (selectedApp - 1 + totalApps) % totalApps;
+                newState = true;
+                std::cout << "[Navigation] Left - Selected app: " << selectedApp << std::endl;
                 break;
-            case 'D': // Down arrow
-                std::cout << "[Navigation] Down - Next app" << std::endl;
+            case 'R': // Right arrow
+                selectedApp = (selectedApp + 1) % totalApps;
+                newState = true;
+                std::cout << "[Navigation] Right - Selected app: " << selectedApp << std::endl;
                 break;
             case '\n': // Enter
-                std::cout << "[Navigation] Enter - Launch Text Editor" << std::endl;
+                {
+                    std::cout << "[Navigation] Enter - Launching app: " << selectedApp << std::endl;
+                    // Map selectedApp index to actual AppState enum values
+                    AppState appStates[] = {TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON};
+                    if (selectedApp < sizeof(appStates)/sizeof(appStates[0])) {
+                        CurrentAppState = appStates[selectedApp];
+                        newState = true;
+                        std::cout << "[Navigation] Launching: " << appStateNames[CurrentAppState].c_str() << std::endl;
+                    }
+                }
                 break;
             case 't':
-                std::cout << "[Demo] Switching to text editor mode" << std::endl;
+                selectedApp = 0; // Select TXT app
                 CurrentAppState = TXT;
-                applicationEinkHandler();
+                newState = true;
+                std::cout << "[Demo] Direct switch to text editor" << std::endl;
                 break;
         }
     }
@@ -319,6 +365,105 @@ void processKB_TXT() {
     }
 }
 
+// File manager demo
+void einkHandler_FILEWIZ() {
+    if (!g_display) return;
+    
+    g_display->einkClear();
+    g_display->einkDrawText("FILE MANAGER", 10, 20);
+    g_display->einkDrawText("Files:", 10, 40);
+    g_display->einkDrawText("- document.txt", 20, 60);
+    g_display->einkDrawText("- notes.txt", 20, 80);
+    g_display->einkDrawText("- config.cfg", 20, 100);
+    g_display->einkDrawText("Press 'h' for Home", 10, 120);
+    g_display->einkRefresh();
+}
+
+// Tasks demo
+void einkHandler_TASKS() {
+    if (!g_display) return;
+    
+    g_display->einkClear();
+    g_display->einkDrawText("TASKS", 10, 20);
+    g_display->einkDrawText("Today:", 10, 40);
+    g_display->einkDrawText("[ ] Review code", 20, 60);
+    g_display->einkDrawText("[x] Test emulator", 20, 80);
+    g_display->einkDrawText("[ ] Write docs", 20, 100);
+    g_display->einkDrawText("Press 'h' for Home", 10, 120);
+    g_display->einkRefresh();
+}
+
+// Calendar demo
+void einkHandler_CALENDAR() {
+    if (!g_display) return;
+    
+    g_display->einkClear();
+    g_display->einkDrawText("CALENDAR", 10, 20);
+    g_display->einkDrawText("August 2025", 10, 40);
+    g_display->einkDrawText("S  M  T  W  T  F  S", 10, 60);
+    g_display->einkDrawText("               1  2", 10, 80);
+    g_display->einkDrawText("3  4  5  6  7  8  9", 10, 100);
+    g_display->einkDrawText("Press 'h' for Home", 10, 120);
+    g_display->einkRefresh();
+}
+
+// Settings demo
+void einkHandler_SETTINGS() {
+    if (!g_display) return;
+    
+    g_display->einkClear();
+    g_display->einkDrawText("SETTINGS", 10, 20);
+    g_display->einkDrawText("Display:", 10, 40);
+    g_display->einkDrawText("  Brightness: 100%", 20, 60);
+    g_display->einkDrawText("  Timeout: 30s", 20, 80);
+    g_display->einkDrawText("System:", 10, 100);
+    g_display->einkDrawText("  Debug: OFF", 20, 120);
+    g_display->einkDrawText("Press 'h' for Home", 10, 140);
+    g_display->einkRefresh();
+}
+
+// USB demo
+void einkHandler_USB() {
+    if (!g_display) return;
+    
+    g_display->einkClear();
+    g_display->einkDrawText("USB STORAGE", 10, 20);
+    g_display->einkDrawText("Status: Connected", 10, 40);
+    g_display->einkDrawText("Mode: Mass Storage", 10, 60);
+    g_display->einkDrawText("Files accessible", 10, 80);
+    g_display->einkDrawText("from computer", 10, 100);
+    g_display->einkDrawText("Press 'h' for Home", 10, 120);
+    g_display->einkRefresh();
+}
+
+// Journal demo
+void einkHandler_JOURNAL() {
+    if (!g_display) return;
+    
+    g_display->einkClear();
+    g_display->einkDrawText("JOURNAL", 10, 20);
+    g_display->einkDrawText("Today's Entry:", 10, 40);
+    g_display->einkDrawText("Working on PocketMage", 10, 60);
+    g_display->einkDrawText("emulator development.", 10, 80);
+    g_display->einkDrawText("Great progress!", 10, 100);
+    g_display->einkDrawText("Press 'h' for Home", 10, 120);
+    g_display->einkRefresh();
+}
+
+// Lexicon demo
+void einkHandler_LEXICON() {
+    if (!g_display) return;
+    
+    g_display->einkClear();
+    g_display->einkDrawText("LEXICON", 10, 20);
+    g_display->einkDrawText("Dictionary & Thesaurus", 10, 40);
+    g_display->einkDrawText("Search: emulator", 10, 60);
+    g_display->einkDrawText("Definition: A system", 10, 80);
+    g_display->einkDrawText("that mimics another", 10, 100);
+    g_display->einkDrawText("Press 'h' for Home", 10, 120);
+    g_display->einkRefresh();
+}
+
 void applicationEinkHandler() {
     switch (CurrentAppState) {
         case HOME:
@@ -326,6 +471,27 @@ void applicationEinkHandler() {
             break;
         case TXT:
             einkHandler_TXT();
+            break;
+        case FILEWIZ:
+            einkHandler_FILEWIZ();
+            break;
+        case TASKS:
+            einkHandler_TASKS();
+            break;
+        case SETTINGS:
+            einkHandler_SETTINGS();
+            break;
+        case USB_APP:
+            einkHandler_USB();
+            break;
+        case CALENDAR:
+            einkHandler_CALENDAR();
+            break;
+        case LEXICON:
+            einkHandler_LEXICON();
+            break;
+        case JOURNAL:
+            einkHandler_JOURNAL();
             break;
         default:
             einkHandler_HOME();
@@ -341,9 +507,115 @@ void processKB() {
         case TXT:
             processKB_TXT();
             break;
+        case FILEWIZ:
+            processKB_FILEWIZ();
+            break;
+        case TASKS:
+            processKB_TASKS();
+            break;
+        case SETTINGS:
+            processKB_SETTINGS();
+            break;
+        case USB_APP:
+            processKB_USB();
+            break;
+        case CALENDAR:
+            processKB_CALENDAR();
+            break;
+        case LEXICON:
+            processKB_LEXICON();
+            break;
+        case JOURNAL:
+            processKB_JOURNAL();
+            break;
         default:
             processKB_HOME();
             break;
+    }
+}
+
+// Keyboard handlers for other apps
+void processKB_FILEWIZ() {
+    char key = updateKeypress();
+    if (key != 0) {
+        std::cout << "[FILES] Key pressed: '" << key << "'" << std::endl;
+        if (key == 'h') {
+            std::cout << "[FILES] Returning to home" << std::endl;
+            CurrentAppState = HOME;
+            newState = true;
+        }
+    }
+}
+
+void processKB_TASKS() {
+    char key = updateKeypress();
+    if (key != 0) {
+        std::cout << "[TASKS] Key pressed: '" << key << "'" << std::endl;
+        if (key == 'h') {
+            std::cout << "[TASKS] Returning to home" << std::endl;
+            CurrentAppState = HOME;
+            newState = true;
+        }
+    }
+}
+
+void processKB_CALENDAR() {
+    char key = updateKeypress();
+    if (key != 0) {
+        std::cout << "[CALENDAR] Key pressed: '" << key << "'" << std::endl;
+        if (key == 'h') {
+            std::cout << "[CALENDAR] Returning to home" << std::endl;
+            CurrentAppState = HOME;
+            newState = true;
+        }
+    }
+}
+
+void processKB_SETTINGS() {
+    char key = updateKeypress();
+    if (key != 0) {
+        std::cout << "[SETTINGS] Key pressed: '" << key << "'" << std::endl;
+        if (key == 'h') {
+            std::cout << "[SETTINGS] Returning to home" << std::endl;
+            CurrentAppState = HOME;
+            newState = true;
+        }
+    }
+}
+
+void processKB_USB() {
+    char key = updateKeypress();
+    if (key != 0) {
+        std::cout << "[USB] Key pressed: '" << key << "'" << std::endl;
+        if (key == 'h') {
+            std::cout << "[USB] Returning to home" << std::endl;
+            CurrentAppState = HOME;
+            newState = true;
+        }
+    }
+}
+
+void processKB_JOURNAL() {
+    char key = updateKeypress();
+    if (key != 0) {
+        std::cout << "[JOURNAL] Key pressed: '" << key << "'" << std::endl;
+        if (key == 'h') {
+            std::cout << "[JOURNAL] Returning to home" << std::endl;
+            CurrentAppState = HOME;
+            newState = true;
+        }
+    }
+}
+
+void processKB_LEXICON() {
+    char key = updateKeypress();
+    if (key != 0) {
+        std::cout << "[LEXICON] Key pressed: '" << key << "'" << std::endl;
+        if (key == 'h') {
+            std::cout << "[LEXICON] Returning to home" << std::endl;
+            CurrentAppState = HOME;
+            newState = true;
+        }
     }
 }
 
@@ -362,6 +634,10 @@ void setup() {
     // Initialize mock SD card
     SD_MMC.begin();
     
+    // Initialize state
+    newState = true;
+    CurrentAppState = HOME;
+    
     Serial.println("Setup complete!");
     
     // Show initial screen
@@ -375,6 +651,7 @@ void loop() {
     }
     
     processKB();
+    applicationEinkHandler(); // Update display after processing input
     g_display->present();
     
     // Limit frame rate
