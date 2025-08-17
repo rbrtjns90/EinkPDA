@@ -1,6 +1,9 @@
 #ifndef HARDWARE_SHIM_H
 #define HARDWARE_SHIM_H
 
+// Define this before any PocketMage includes
+#define DESKTOP_EMULATOR
+
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -28,31 +31,8 @@ public:
 };
 extern MockSerial Serial;
 
-// Mock String class (simplified)
-class String {
-public:
-    std::string data;
-    
-    String() = default;
-    String(const char* str) : data(str) {}
-    String(const std::string& str) : data(str) {}
-    String(int num) : data(std::to_string(num)) {}
-    String(float num) : data(std::to_string(num)) {}
-    
-    const char* c_str() const { return data.c_str(); }
-    size_t length() const { return data.length(); }
-    String substring(size_t start, size_t end = std::string::npos) const;
-    int indexOf(const String& str, int start = 0) const;
-    String replace(const String& from, const String& to) const;
-    String toLowerCase() const;
-    String toUpperCase() const;
-    
-    String operator+(const String& other) const;
-    String& operator+=(const String& other);
-    bool operator==(const String& other) const;
-    bool operator!=(const String& other) const;
-    char operator[](size_t index) const;
-};
+// Use std::string directly instead of custom String class
+typedef std::string String;
 
 // Mock File system
 class File {

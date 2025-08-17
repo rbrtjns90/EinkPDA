@@ -1,27 +1,33 @@
 #include "hardware_shim.h"
 #include "desktop_display.h"
-#include <iostream>
 #include <chrono>
 #include <thread>
-#include <random>
-#include <algorithm>
-#include <cctype>
+#include <iostream>
+#include <fstream>
+#include <filesystem>
 
-// Global instances
+// Arduino compatibility implementations
 MockSerial Serial;
 MockSDCard SD_MMC;
 
-// Timing
-static auto startTime = std::chrono::steady_clock::now();
+unsigned long millis() {
+    static auto start = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
+}
+
+unsigned long micros() {
+    static auto start = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+    return std::chrono::duration_cast<std::chrono::microseconds>(now - start).count();
+}
 
 void delay(unsigned long ms) {
     std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
-unsigned long millis() {
-    auto now = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime);
-    return duration.count();
+void delayMicroseconds(unsigned int us) {
+    std::this_thread::sleep_for(std::chrono::microseconds(us));
 }
 
 void randomSeed(unsigned long seed) {
@@ -53,61 +59,7 @@ void MockSerial::flush() {
     std::cout.flush();
 }
 
-// String implementation
-String String::substring(size_t start, size_t end) const {
-    if (end == std::string::npos) {
-        return String(data.substr(start));
-    }
-    return String(data.substr(start, end - start));
-}
-
-int String::indexOf(const String& str, int start) const {
-    size_t pos = data.find(str.data, start);
-    return pos == std::string::npos ? -1 : static_cast<int>(pos);
-}
-
-String String::replace(const String& from, const String& to) const {
-    std::string result = data;
-    size_t pos = 0;
-    while ((pos = result.find(from.data, pos)) != std::string::npos) {
-        result.replace(pos, from.data.length(), to.data);
-        pos += to.data.length();
-    }
-    return String(result);
-}
-
-String String::toLowerCase() const {
-    std::string result = data;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return String(result);
-}
-
-String String::toUpperCase() const {
-    std::string result = data;
-    std::transform(result.begin(), result.end(), result.begin(), ::toupper);
-    return String(result);
-}
-
-String String::operator+(const String& other) const {
-    return String(data + other.data);
-}
-
-String& String::operator+=(const String& other) {
-    data += other.data;
-    return *this;
-}
-
-bool String::operator==(const String& other) const {
-    return data == other.data;
-}
-
-bool String::operator!=(const String& other) const {
-    return data != other.data;
-}
-
-char String::operator[](size_t index) const {
-    return index < data.size() ? data[index] : '\0';
-}
+// String implementation removed - using std::string directly
 
 // File implementation
 File::File() : isOpen(false) {}
@@ -252,11 +204,11 @@ void MockGxEPD2::setFont(const void* font) {}
 void MockGxEPD2::setCursor(int16_t x, int16_t y) {}
 
 void MockGxEPD2::print(const String& text) {
-    if (g_display) g_display->einkDrawText(text.data, 0, 0);
+    if (g_display) g_display->einkDrawText(text.c_str(), 0, 0);
 }
 
 void MockGxEPD2::println(const String& text) {
-    if (g_display) g_display->einkDrawText(text.data, 0, 0);
+    if (g_display) g_display->einkDrawText(text.c_str(), 0, 0);
 }
 
 void MockGxEPD2::drawPixel(int16_t x, int16_t y, uint16_t color) {
@@ -295,7 +247,7 @@ void MockU8G2::setFont(const uint8_t* font) {}
 void MockU8G2::setCursor(int16_t x, int16_t y) {}
 
 void MockU8G2::print(const String& text) {
-    if (g_display) g_display->oledDrawText(text.data, 0, 0);
+    if (g_display) g_display->oledDrawText(text.c_str(), 0, 0);
 }
 
 void MockU8G2::drawStr(int16_t x, int16_t y, const char* str) {
@@ -358,7 +310,7 @@ void xTaskCreatePinnedToCore(void (*task)(void*), const char* name,
     uint32_t stackSize, void* params, uint8_t priority, 
     TaskHandle_t* handle, uint8_t core) {}
 void vTaskDelay(uint32_t ticks) { delay(ticks); }
-void yield() { std::this_thread::yield(); }
+// yield() already defined in esp32_shims.h
 void esp_sleep_enable_ext0_wakeup(uint8_t pin, int level) {}
 void esp_deep_sleep_start() { exit(0); }
 void setCpuFrequencyMhz(uint32_t freq) {

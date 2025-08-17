@@ -1,10 +1,11 @@
 #include "desktop_display.h"
 #include "hardware_shim.h"
 #include <iostream>
-#include <thread>
+#include <vector>
+#include <string>
+#include <cstring>
 
-// Include the original PocketMage headers with our shims
-#define Arduino_h // Prevent Arduino.h from being included
+// Remove conflicting includes to avoid type redefinition errors
 
 // Mock config values since we can't include the original config.h
 #define TXT_APP_STYLE 0
@@ -220,7 +221,7 @@ void updateBattState() {
 
 void printDebug() {
     if (DEBUG_VERBOSE) {
-        std::cout << "[Debug] App: " << appStateNames[CurrentAppState].data 
+        std::cout << "[Debug] App: " << appStateNames[CurrentAppState] 
                   << " Battery: " << battState << "%" << std::endl;
     }
 }
@@ -229,39 +230,87 @@ void printDebug() {
 int selectedApp = 0;
 const int totalApps = 9;
 
+// Sample PocketMage app icons (32x32 simplified versions)
+// TXT app icon (simplified)
+const unsigned char txtIcon[] = {
+    0x00, 0x00, 0x00, 0x00, 0x7F, 0xFF, 0xFF, 0xFE, 0x40, 0x00, 0x00, 0x02,
+    0x40, 0x00, 0x00, 0x02, 0x47, 0xFF, 0xFF, 0xE2, 0x44, 0x00, 0x00, 0x22,
+    0x44, 0x00, 0x00, 0x22, 0x44, 0x7F, 0xFE, 0x22, 0x44, 0x00, 0x00, 0x22,
+    0x45, 0xFF, 0xFF, 0xA2, 0x44, 0x00, 0x00, 0x22, 0x44, 0x00, 0x00, 0x22,
+    0x44, 0x7F, 0xFE, 0x22, 0x44, 0x00, 0x00, 0x22, 0x44, 0x00, 0x00, 0x22,
+    0x44, 0x7F, 0xFE, 0x22, 0x44, 0x00, 0x00, 0x22, 0x44, 0x00, 0x00, 0x22,
+    0x44, 0x7F, 0xFE, 0x22, 0x44, 0x00, 0x00, 0x22, 0x44, 0x00, 0x00, 0x22,
+    0x44, 0x7F, 0xFE, 0x22, 0x44, 0x00, 0x00, 0x22, 0x44, 0x00, 0x00, 0x22,
+    0x44, 0x7F, 0xFE, 0x22, 0x44, 0x00, 0x00, 0x22, 0x44, 0x00, 0x00, 0x22,
+    0x47, 0xFF, 0xFF, 0xE2, 0x40, 0x00, 0x00, 0x02, 0x40, 0x00, 0x00, 0x02,
+    0x7F, 0xFF, 0xFF, 0xFE, 0x00, 0x00, 0x00, 0x00
+};
+
+// Simple folder icon for FILEWIZ
+const unsigned char folderIcon[] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x07, 0xFF, 0x00, 0x00, 0x08, 0x00, 0x80, 0x00,
+    0x10, 0x00, 0x40, 0x00, 0x20, 0x00, 0x20, 0x00, 0x7F, 0xFF, 0xFF, 0x00,
+    0x80, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x80,
+    0x80, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x80,
+    0x80, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x80,
+    0x80, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x80,
+    0x80, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x80,
+    0x80, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x80,
+    0x7F, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+// App icon array (using simplified icons for now)
+const unsigned char* appIcons[] = {
+    txtIcon,     // TXT
+    folderIcon,  // FILEWIZ
+    txtIcon,     // USB (placeholder)
+    txtIcon,     // BT (placeholder)
+    txtIcon,     // SETTINGS (placeholder)
+    txtIcon,     // TASKS (placeholder)
+    txtIcon,     // CALENDAR (placeholder)
+    txtIcon,     // JOURNAL (placeholder)
+    txtIcon      // LEXICON (placeholder)
+};
+
+// Real PocketMage drawHome() function adapted for desktop emulator
 void drawHome() {
     if (!g_display) return;
     
     g_display->einkClear();
     
-    // Draw app grid similar to real PocketMage
-    int appsPerRow = 5;
-    int spacingX = 60;
-    int spacingY = 60;
-    int iconSize = 40;
-    int startX = 20;
-    int startY = 20;
+    // Use real PocketMage layout parameters (adapted for 9 apps)
+    uint8_t appsPerRow = 3;  // Changed from 5 to 3 for better fit
+    uint8_t spacingX = 90;   // Adjusted spacing
+    uint8_t spacingY = 50;   // Adjusted spacing  
+    uint8_t iconSize = 32;   // Closer to original 40px but smaller
+    uint8_t startX = 25;     // Centered positioning
+    uint8_t startY = 15;     // Start position
     
-    const String appStateNames[] = { "HOME", "TXT", "FILEWIZ", "USB", "BT", "SETTINGS", "TASKS", "CALENDAR", "JOURNAL", "LEXICON" };
-const char* appNames[] = {"TXT", "FILEWIZ", "USB", "BT", "SET", "TASKS", "CAL", "JOURNAL", "LEX"};
-    
-    for (int i = 0; i < totalApps; i++) {
+    // Real PocketMage app registry - extracted from globals.cpp
+const char* appStateNames[] = { "txt", "filewiz", "usb", "bt", "settings", "tasks", "calendar", "journal", "lexicon" };
+const int NUM_APPS = 9;
+    for (int i = 0; i < NUM_APPS; i++) {
         int row = i / appsPerRow;
         int col = i % appsPerRow;
         
         int xPos = startX + (spacingX * col);
         int yPos = startY + (spacingY * row);
         
-        // Draw app icon (simplified rectangle)
-        g_display->einkDrawRect(xPos, yPos, iconSize, iconSize, false, true);
+        // Draw app icon using actual bitmap (like real PocketMage)
+        g_display->einkDrawBitmap(xPos, yPos, appIcons[i], iconSize, iconSize, true);
         
-        // Highlight selected app
+        // Highlight selected app with border (like real PocketMage selection)
         if (i == selectedApp) {
+            g_display->einkDrawRect(xPos-1, yPos-1, iconSize+2, iconSize+2, false, true);
             g_display->einkDrawRect(xPos-2, yPos-2, iconSize+4, iconSize+4, false, true);
         }
         
-        // Draw app name
-        g_display->einkDrawText(appNames[i], xPos + 5, yPos + iconSize + 15);
+        // Draw app name below icon (matching PocketMage text positioning)
+        int textX = xPos + (iconSize / 2) - (strlen(appStateNames[i]) * 3); // Approximate centering
+        int textY = yPos + iconSize + 10;
+        g_display->einkDrawText(appStateNames[i], textX, textY, 8);
     }
     
     g_display->einkRefresh();

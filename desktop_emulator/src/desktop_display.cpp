@@ -203,10 +203,33 @@ void DesktopDisplay::einkDrawRect(int x, int y, int w, int h, bool filled, bool 
             }
         }
     } else {
-        einkDrawLine(x, y, x + w - 1, y, black);
-        einkDrawLine(x, y + h - 1, x + w - 1, y + h - 1, black);
-        einkDrawLine(x, y, x, y + h - 1, black);
-        einkDrawLine(x + w - 1, y, x + w - 1, y + h - 1, black);
+        // Draw outline
+        for (int dx = 0; dx < w; dx++) {
+            einkSetPixel(x + dx, y, black);
+            einkSetPixel(x + dx, y + h - 1, black);
+        }
+        for (int dy = 0; dy < h; dy++) {
+            einkSetPixel(x, y + dy, black);
+            einkSetPixel(x + w - 1, y + dy, black);
+        }
+    }
+}
+
+void DesktopDisplay::einkDrawBitmap(int x, int y, const unsigned char* bitmap, int w, int h, bool black) {
+    if (!bitmap) return;
+    
+    int byteWidth = (w + 7) / 8; // Bitmap width in bytes
+    
+    for (int dy = 0; dy < h; dy++) {
+        for (int dx = 0; dx < w; dx++) {
+            int byteIndex = dy * byteWidth + dx / 8;
+            int bitIndex = 7 - (dx % 8);
+            
+            bool pixelOn = (bitmap[byteIndex] >> bitIndex) & 1;
+            if (pixelOn) {
+                einkSetPixel(x + dx, y + dy, black);
+            }
+        }
     }
 }
 

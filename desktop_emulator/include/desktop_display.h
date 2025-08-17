@@ -30,6 +30,7 @@ public:
     void einkDrawText(const std::string& text, int x, int y, int size = 12);
     void einkDrawLine(int x0, int y0, int x1, int y1, bool black = true);
     void einkDrawRect(int x, int y, int w, int h, bool filled = false, bool black = true);
+    void einkDrawBitmap(int x, int y, const unsigned char* bitmap, int w, int h, bool black = true);
     void einkRefresh();
     void einkPartialRefresh();
     
