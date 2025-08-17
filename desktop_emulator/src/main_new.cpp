@@ -61,6 +61,9 @@ void emulatorSetup() {
     setup();
 }
 
+// Forward declare the application handler
+extern void applicationEinkHandler();
+
 // Emulator-specific loop
 void emulatorLoop() {
     if (!g_display->handleEvents()) {
@@ -69,6 +72,9 @@ void emulatorLoop() {
     
     // Call real PocketMage loop
     loop();
+    
+    // Call the E-Ink handler to render UI
+    applicationEinkHandler();
     
     g_display->present();
     

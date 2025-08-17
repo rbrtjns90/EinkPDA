@@ -30,22 +30,22 @@ bool DesktopDisplay::init() {
         return false;
     }
     
-    // Create E-Ink window
+    // Create E-Ink window with explicit positioning
     einkWindow = SDL_CreateWindow("PocketMage E-Ink Display (310x128)",
-        SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+        100, 100,  // Explicit position instead of SDL_WINDOWPOS_UNDEFINED
         EINK_WIDTH * SCALE_FACTOR, EINK_HEIGHT * SCALE_FACTOR,
-        SDL_WINDOW_SHOWN);
+        SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
     
     if (!einkWindow) {
         std::cerr << "E-Ink window could not be created! SDL_Error: " << SDL_GetError() << std::endl;
         return false;
     }
     
-    // Create OLED window
+    // Create OLED window with explicit positioning
     oledWindow = SDL_CreateWindow("PocketMage OLED Display (256x32)",
-        SDL_WINDOWPOS_UNDEFINED + EINK_WIDTH * SCALE_FACTOR + 50, SDL_WINDOWPOS_UNDEFINED,
+        100 + EINK_WIDTH * SCALE_FACTOR + 50, 100,  // Position next to E-Ink window
         OLED_WIDTH * SCALE_FACTOR, OLED_HEIGHT * SCALE_FACTOR,
-        SDL_WINDOW_SHOWN);
+        SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
     
     if (!oledWindow) {
         std::cerr << "OLED window could not be created! SDL_Error: " << SDL_GetError() << std::endl;
@@ -99,6 +99,29 @@ bool DesktopDisplay::init() {
     if (!font || !smallFont) {
         std::cerr << "Warning: Could not load fonts. Text rendering may not work." << std::endl;
     }
+    
+    // Force windows to be visible and raised on macOS
+    SDL_ShowWindow(einkWindow);
+    SDL_ShowWindow(oledWindow);
+    SDL_RaiseWindow(einkWindow);
+    SDL_RaiseWindow(oledWindow);
+    
+    // Additional macOS-specific window management
+    SDL_SetWindowAlwaysOnTop(einkWindow, SDL_TRUE);
+    SDL_SetWindowAlwaysOnTop(oledWindow, SDL_TRUE);
+    
+    // Force focus to the windows
+    SDL_SetWindowInputFocus(einkWindow);
+    
+    // Clear both displays initially
+    einkClear();
+    oledClear();
+    present();
+    
+    // Give SDL time to process window events
+    SDL_PumpEvents();
+    
+    std::cout << "[Display] SDL2 windows initialized and visible" << std::endl;
     
     return true;
 }

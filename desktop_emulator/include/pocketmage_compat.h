@@ -491,6 +491,7 @@ public:
             std::cout << "[DISPLAY] Drawing text: '" << text << "' at (" << cursor_x << "," << cursor_y << ")" << std::endl;
             g_display->einkDrawText(text, cursor_x, cursor_y);
             cursor_x += strlen(text) * 8;
+            g_display->present(); // Force immediate rendering
         }
     }
     void print(const String& text) { print(text.c_str()); }

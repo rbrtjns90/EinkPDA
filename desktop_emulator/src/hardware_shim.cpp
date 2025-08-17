@@ -380,6 +380,14 @@ BaseType_t xTaskCreatePinnedToCore(void (*pvTaskCode)(void*), const char* const 
                                   UBaseType_t uxPriority, TaskHandle_t* const pvCreatedTask,
                                   const BaseType_t xCoreID) {
     std::cout << "[FreeRTOS] Created task: " << pcName << " on core " << xCoreID << std::endl;
+    
+    // For the einkHandler task, we need to actually call it to render the UI
+    if (std::string(pcName) == "einkHandlerTask" && pvTaskCode) {
+        std::cout << "[Emulator] Starting einkHandler task for UI rendering" << std::endl;
+        // Call the task function once to trigger initial rendering
+        pvTaskCode(pvParameters);
+    }
+    
     return pdPASS;
 }
 // yield() already defined in esp32_shims.h
