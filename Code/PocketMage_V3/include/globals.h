@@ -117,9 +117,9 @@ extern KBState CurrentKBState;
 extern uint8_t partialCounter;
 extern volatile bool forceSlowFullUpdate;
 
-enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
+enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON, POKEDEX };
 extern const String appStateNames[];
-extern const unsigned char *appIcons[9];
+extern const unsigned char *appIcons[10];
 extern AppState CurrentAppState;
 
 // <TXT.cpp>
@@ -189,6 +189,10 @@ extern LexState CurrentLexState;
 // <JOURNAL.cpp>
 enum JournalState {J_MENU, J_TXT};
 extern JournalState CurrentJournalState;
+
+// <POKEDEX.cpp>
+enum PokedexState {POKE_LIST, POKE_DETAIL, POKE_SEARCH};
+extern PokedexState CurrentPokedexState;
 
 
 // FUNCTION PROTOTYPES
@@ -310,6 +314,11 @@ void einkHandler_LEXICON();
 void JOURNAL_INIT();
 void processKB_JOURNAL();
 void einkHandler_JOURNAL();
+
+// <POKEDEX.cpp>
+void POKEDEX_INIT();
+void processKB_POKEDEX();
+void einkHandler_POKEDEX();
 
 // <PocketMage>
 void applicationEinkHandler();

@@ -48,6 +48,9 @@ void applicationEinkHandler() {
     case JOURNAL:
       einkHandler_JOURNAL();
       break;
+    case POKEDEX:
+      einkHandler_POKEDEX();
+      break;
     // ADD APP CASES HERE
     default:
       einkHandler_HOME();
@@ -91,6 +94,9 @@ void processKB() {
       break;
     case JOURNAL:
       processKB_JOURNAL();
+      break;
+    case POKEDEX:
+      processKB_POKEDEX();
       break;
     // ADD APP CASES HERE
     default:

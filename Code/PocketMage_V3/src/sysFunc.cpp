@@ -895,6 +895,9 @@ void loadState(bool changeState) {
       case JOURNAL:
         JOURNAL_INIT();
         break;
+      case POKEDEX:
+        POKEDEX_INIT();
+        break;
     }
   }
 

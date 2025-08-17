@@ -52,6 +52,7 @@ set(POCKETMAGE_SOURCES_MANUAL
     ${POCKETMAGE_SRC}/HOME.cpp
     ${POCKETMAGE_SRC}/JOURNAL.cpp
     ${POCKETMAGE_SRC}/LEXICON.cpp
+    ${POCKETMAGE_SRC}/POKEDEX.cpp
 )
 
 # Desktop emulator source files

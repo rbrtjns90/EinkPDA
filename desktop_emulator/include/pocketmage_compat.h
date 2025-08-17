@@ -301,6 +301,9 @@ extern bool noTimeout;
 extern bool SAVE_POWER;
 extern String SLEEPMODE;
 extern String editingFile;
+extern String currentLine;
+extern std::vector<String> allLines;
+extern volatile long int dynamicScroll;
 
 // PocketMage app initialization functions
 void TXT_INIT();

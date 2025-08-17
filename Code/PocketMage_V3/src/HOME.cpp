@@ -121,6 +121,11 @@ void commandSelect(String command) {
     JOURNAL_INIT();
   }
   /////////////////////////////
+  else if (command == "pokedex" || command == "pokemon" || command == "poke" || command == "10") {
+    std::cout << "[POCKETMAGE] Matched pokedex command! Calling POKEDEX_INIT()" << std::endl;
+    POKEDEX_INIT();
+  }
+  /////////////////////////////
   else if (command == "i farted") {
     oledWord("That smells");
     delay(1000);

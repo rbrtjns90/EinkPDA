@@ -1,5 +1,10 @@
 #include "pocketmage_compat.h"
 #include "desktop_display.h"
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <cstring>
+#include <algorithm>
 #include "SD_MMC.h"
 #include "Wire.h"
 #include "Preferences.h"
@@ -8,6 +13,8 @@
 
 // Access to global display instance
 extern DesktopDisplay* g_display;
+
+// TXT app variables are defined in globals.cpp
 
 // Include AppState enum definition
 enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
@@ -622,7 +629,34 @@ void einkHandler_USB() {
 }
 
 void einkTextDynamic(bool refresh, bool clear) {
-    std::cout << "[EinkText] refresh=" << refresh << " clear=" << clear << std::endl;
+    std::cout << "[EinkTextDynamic] refresh=" << refresh << " clear=" << clear << std::endl;
+    
+    if (g_display) {
+        if (clear) {
+            g_display->einkClear();
+        }
+        
+        // Render text from allLines vector and currentLine
+        int y = 20; // Start position
+        int lineHeight = 16;
+        int maxLines = (128 - 40) / lineHeight; // Leave space for status bar
+        
+        // Calculate starting line based on scroll
+        int startLine = std::max(0, (int)allLines.size() - maxLines + (int)dynamicScroll);
+        
+        // Render lines from allLines vector
+        for (int i = startLine; i < allLines.size() && y < 100; i++) {
+            if (i >= 0 && allLines[i].length() > 0) {
+                g_display->einkDrawText(allLines[i].c_str(), 5, y, 12);
+            }
+            y += lineHeight;
+        }
+        
+        // Render current line being typed
+        if (currentLine.length() > 0 && y < 100) {
+            g_display->einkDrawText(currentLine.c_str(), 5, y, 12);
+        }
+    }
 }
 
 void einkTextPartial(String text, bool clear) {
