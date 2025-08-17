@@ -161,6 +161,10 @@ const char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "
 char lastInputChar = 0;
 bool keyboardInputAvailable = false;
 
+// Forward declarations
+void applicationEinkHandler();
+void processKB();
+
 char updateKeypress() {
     if (!g_display) return 0;
     
@@ -214,17 +218,27 @@ void printDebug() {
     }
 }
 
-// Simplified app functions for demo
+// Enhanced app functions showing PocketMage-style interface
 void einkHandler_HOME() {
     if (!g_display) return;
     
     g_display->einkClear();
-    g_display->einkDrawText("PocketMage Desktop Emulator", 10, 20);
-    g_display->einkDrawText("Press keys to test:", 10, 40);
-    g_display->einkDrawText("Arrow keys = navigation", 10, 55);
-    g_display->einkDrawText("Enter = select", 10, 70);
-    g_display->einkDrawText("Letters/numbers = input", 10, 85);
-    g_display->einkDrawText("ESC = quit", 10, 100);
+    
+    // Draw title bar
+    g_display->einkDrawRect(0, 0, 310, 20, true, true);
+    g_display->einkDrawText("PocketMage V3", 10, 5);
+    
+    // Draw app icons/menu
+    g_display->einkDrawText("Applications:", 10, 30);
+    g_display->einkDrawText("> Text Editor", 20, 50);
+    g_display->einkDrawText("  File Manager", 20, 65);
+    g_display->einkDrawText("  Tasks", 20, 80);
+    g_display->einkDrawText("  Calendar", 20, 95);
+    g_display->einkDrawText("  Settings", 20, 110);
+    
+    // Draw selection indicator
+    g_display->einkDrawText("*", 10, 50);
+    
     g_display->einkRefresh();
 }
 
@@ -233,11 +247,74 @@ void processKB_HOME() {
     if (key != 0) {
         std::cout << "[Input] Key pressed: '" << key << "'" << std::endl;
         
-        // Update OLED with last key
+        // Update OLED with system info
         if (g_display) {
             g_display->oledClear();
-            g_display->oledDrawText("Last key: " + std::string(1, key), 5, 10);
+            g_display->oledDrawText("PocketMage V3 - Battery: 100%", 5, 5);
+            g_display->oledDrawText("Key: " + std::string(1, key) + " | Apps: 5", 5, 20);
             g_display->oledUpdate();
+        }
+        
+        // Handle navigation
+        switch (key) {
+            case 'U': // Up arrow
+                std::cout << "[Navigation] Up - Previous app" << std::endl;
+                break;
+            case 'D': // Down arrow
+                std::cout << "[Navigation] Down - Next app" << std::endl;
+                break;
+            case '\n': // Enter
+                std::cout << "[Navigation] Enter - Launch Text Editor" << std::endl;
+                break;
+            case 't':
+                std::cout << "[Demo] Switching to text editor mode" << std::endl;
+                CurrentAppState = TXT;
+                applicationEinkHandler();
+                break;
+        }
+    }
+}
+
+// Text editor demo
+void einkHandler_TXT() {
+    if (!g_display) return;
+    
+    g_display->einkClear();
+    
+    // Draw title bar
+    g_display->einkDrawRect(0, 0, 310, 20, true, true);
+    g_display->einkDrawText("Text Editor", 10, 5);
+    
+    // Draw text content
+    g_display->einkDrawText("Sample text file:", 10, 30);
+    g_display->einkDrawText("Hello from PocketMage!", 10, 50);
+    g_display->einkDrawText("This is a demo of the", 10, 65);
+    g_display->einkDrawText("desktop emulator running", 10, 80);
+    g_display->einkDrawText("actual PocketMage code.", 10, 95);
+    g_display->einkDrawText("Press 'h' to go home.", 10, 110);
+    
+    // Draw cursor
+    g_display->einkDrawText("_", 200, 95);
+    
+    g_display->einkRefresh();
+}
+
+void processKB_TXT() {
+    char key = updateKeypress();
+    if (key != 0) {
+        std::cout << "[TXT] Key pressed: '" << key << "'" << std::endl;
+        
+        if (g_display) {
+            g_display->oledClear();
+            g_display->oledDrawText("Text Editor - Editing file", 5, 5);
+            g_display->oledDrawText("Char: " + std::string(1, key) + " | Line: 5", 5, 20);
+            g_display->oledUpdate();
+        }
+        
+        if (key == 'h') {
+            std::cout << "[TXT] Returning to home" << std::endl;
+            CurrentAppState = HOME;
+            applicationEinkHandler();
         }
     }
 }
@@ -246,6 +323,9 @@ void applicationEinkHandler() {
     switch (CurrentAppState) {
         case HOME:
             einkHandler_HOME();
+            break;
+        case TXT:
+            einkHandler_TXT();
             break;
         default:
             einkHandler_HOME();
@@ -257,6 +337,9 @@ void processKB() {
     switch (CurrentAppState) {
         case HOME:
             processKB_HOME();
+            break;
+        case TXT:
+            processKB_TXT();
             break;
         default:
             processKB_HOME();
