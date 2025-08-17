@@ -66,16 +66,18 @@ extern void applicationEinkHandler();
 
 // Emulator-specific loop
 void emulatorLoop() {
+    // Handle SDL events first
     if (!g_display->handleEvents()) {
         return; // Quit requested
     }
     
-    // Call real PocketMage loop
+    // Call real PocketMage loop to process input
     loop();
     
     // Call the E-Ink handler to render UI
     applicationEinkHandler();
     
+    // Present only after all rendering is complete
     g_display->present();
     
     // Limit frame rate

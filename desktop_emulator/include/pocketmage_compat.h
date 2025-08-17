@@ -568,6 +568,17 @@ inline bool isDigit(char c) { return std::isdigit(c); }
 inline uint32_t getCpuFrequencyMhz() { return 240; }
 inline void esp_deep_sleep_start() { /* Mock deep sleep */ }
 
+// Arduino compatibility functions (inline to avoid multiple definitions)
+inline long map(long x, long in_min, long in_max, long out_min, long out_max) {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+inline long constrain(long x, long a, long b) {
+    if (x < a) return a;
+    if (x > b) return b;
+    return x;
+}
+
 // GFX font type is defined in Adafruit_GFX.h
 
 // TCA8418 register constants

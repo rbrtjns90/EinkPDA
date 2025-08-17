@@ -141,6 +141,7 @@ void DesktopDisplay::cleanup() {
 }
 
 void DesktopDisplay::einkClear() {
+    std::cout << "[DISPLAY] Clearing E-Ink buffer" << std::endl;
     std::fill(einkBuffer.begin(), einkBuffer.end(), 255); // White
 }
 
@@ -327,7 +328,9 @@ void DesktopDisplay::einkGetTextBounds(const char* text, int x, int y, int16_t* 
 }
 
 void DesktopDisplay::einkRefresh() {
-    updateEinkTexture();
+    // Don't immediately update texture - let the main loop handle presentation
+    // This prevents individual bitmap draws from overwriting each other
+    std::cout << "[DISPLAY] E-Ink refresh requested (deferred)" << std::endl;
 }
 
 void DesktopDisplay::einkPartialRefresh() {
@@ -487,7 +490,10 @@ bool DesktopDisplay::handleEvents() {
 
 char DesktopDisplay::getLastKey() {
     char key = lastKey;
-    lastKey = 0; // Clear after reading
+    if (key != 0) {
+        lastKey = 0; // Clear after reading
+        std::cout << "[SDL2] Returning key: '" << key << "' (ASCII " << (int)key << ")" << std::endl;
+    }
     return key;
 }
 
@@ -510,6 +516,8 @@ void DesktopDisplay::present() {
     SDL_RenderClear(oledRenderer);
     SDL_RenderCopy(oledRenderer, oledTexture, nullptr, nullptr);
     SDL_RenderPresent(oledRenderer);
+    
+    std::cout << "[DISPLAY] Frame presented" << std::endl;
 }
 
 void DesktopDisplay::updateEinkTexture() {
@@ -523,7 +531,8 @@ void DesktopDisplay::updateEinkTexture() {
             for (int x = 0; x < EINK_WIDTH; x++) {
                 Uint8 value = einkBuffer[y * EINK_WIDTH + x];
                 int index = y * pitch + x * 3;
-                if (index + 2 < pitch * EINK_HEIGHT) {
+                // Ensure we don't write beyond the texture bounds
+                if (x < EINK_WIDTH && y < EINK_HEIGHT && index + 2 < pitch * EINK_HEIGHT) {
                     pixelBytes[index] = value;     // R
                     pixelBytes[index + 1] = value; // G
                     pixelBytes[index + 2] = value; // B

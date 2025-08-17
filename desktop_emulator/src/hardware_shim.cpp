@@ -376,7 +376,117 @@ int digitalRead(uint8_t pin) { return 0; }
 void digitalWrite(uint8_t pin, uint8_t value) {}
 int analogRead(uint8_t pin) { return 512; }
 
-// updateKeypress is implemented in real PocketMage sysFunc.cpp
+// Override updateKeypress to directly return SDL2 keyboard input
+char updateKeypress() {
+    if (g_display) {
+        char key = g_display->getLastKey();
+        if (key != 0) {
+            std::cout << "[KEYBOARD] updateKeypress() returning: '" << key << "' (ASCII " << (int)key << ")" << std::endl;
+            return key;
+        }
+    }
+    return 0;
+}
+
+// Full implementations for missing sysFunc.cpp functions
+void printDebug() {
+    std::cout << "[DEBUG] Debug print called" << std::endl;
+}
+
+String removeChar(String str, char c) {
+    String result = "";
+    for (int i = 0; i < str.length(); i++) {
+        if (str[i] != c) result += str[i];
+    }
+    return result;
+}
+
+void PWR_BTN_irq() {
+    std::cout << "[IRQ] Power button interrupt" << std::endl;
+}
+
+void TCA8418_irq() {
+    std::cout << "[IRQ] TCA8418 keyboard interrupt" << std::endl;
+    extern volatile bool TCA8418_event;
+    TCA8418_event = true;
+}
+
+int stringToInt(String str) {
+    return str.toInt();
+}
+
+void appendToFile(String filename, String content) {
+    std::cout << "[FILE] Appending to " << filename.c_str() << ": " << content.c_str() << std::endl;
+    // Mock file operation - could implement actual file I/O if needed
+}
+
+void checkTimeout() {
+    // Mock timeout check - PocketMage uses this for power management
+}
+
+std::vector<String> stringToVector(String str) {
+    std::vector<String> result;
+    String current = "";
+    for (int i = 0; i < str.length(); i++) {
+        if (str[i] == '\n') {
+            if (current.length() > 0) {
+                result.push_back(current);
+                current = "";
+            }
+        } else {
+            current += str[i];
+        }
+    }
+    if (current.length() > 0) {
+        result.push_back(current);
+    }
+    return result;
+}
+
+String vectorToString() {
+    // Mock implementation - would normally convert vector back to string
+    return "";
+}
+
+void updateBattState() {
+    std::cout << "[BATTERY] Battery state updated" << std::endl;
+    // Mock battery state update
+}
+
+void setTimeFromString(String timeStr) {
+    std::cout << "[TIME] Setting time from: " << timeStr.c_str() << std::endl;
+    // Mock time setting
+}
+
+void delFile(String filename) {
+    std::cout << "[FILE] Deleting file: " << filename.c_str() << std::endl;
+    // Mock file deletion
+}
+
+void renFile(String oldName, String newName) {
+    std::cout << "[FILE] Renaming " << oldName.c_str() << " to " << newName.c_str() << std::endl;
+    // Mock file rename
+}
+
+void copyFile(String src, String dest) {
+    std::cout << "[FILE] Copying " << src.c_str() << " to " << dest.c_str() << std::endl;
+    // Mock file copy
+}
+
+void loadFile(bool param) {
+    std::cout << "[FILE] Loading file with param: " << param << std::endl;
+    // Mock file loading
+}
+
+void saveFile() {
+    std::cout << "[FILE] Saving file" << std::endl;
+    // Mock file saving
+}
+
+void loadState(bool param) {
+    std::cout << "[STATE] Loading state with param: " << param << std::endl;
+    // Mock state loading - PocketMage uses this to restore app state
+}
 BaseType_t xTaskCreatePinnedToCore(void (*pvTaskCode)(void*), const char* const pcName,
                                   const uint32_t ulStackDepth, void* const pvParameters,
                                   UBaseType_t uxPriority, TaskHandle_t* const pvCreatedTask,

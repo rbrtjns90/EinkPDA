@@ -20,21 +20,9 @@ public:
                 extern volatile bool TCA8418_event;
                 TCA8418_event = true;
                 
-                // Convert ASCII key to TCA8418 keypad matrix position
-                // PocketMage expects: 0x80 | (row*10 + col + 1)
-                // For now, map common keys to reasonable positions
-                int keycode = 1; // default position
-                if (key >= 'a' && key <= 'z') {
-                    keycode = (key - 'a') + 1; // map a-z to positions 1-26
-                } else if (key >= '0' && key <= '9') {
-                    keycode = (key - '0') + 27; // map 0-9 to positions 27-36
-                } else if (key == ' ') {
-                    keycode = 37; // space key
-                } else if (key == '\n' || key == '\r') {
-                    keycode = 38; // enter key
-                }
-                
-                return 0x80 | keycode; // Key pressed format
+                // PocketMage expects actual ASCII characters, not matrix positions
+                // Just return the key pressed with the 0x80 flag
+                return 0x80 | 1; // Indicate key pressed, actual char handled by updateKeypress
             }
         }
         return 0;
