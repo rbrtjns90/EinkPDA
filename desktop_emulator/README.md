@@ -1,6 +1,6 @@
 # PocketMage Desktop Emulator
 
-A desktop SDL2-based emulator for the PocketMage EinkPDA project, allowing you to develop and test the Pokédex app without constantly flashing to hardware.
+A desktop SDL2-based emulator for the PocketMage EinkPDA project, allowing you to develop and test apps without constantly flashing to hardware.
 
 ## Features
 
