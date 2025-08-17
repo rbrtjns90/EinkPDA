@@ -31,6 +31,8 @@ public:
     void einkDrawLine(int x0, int y0, int x1, int y1, bool black = true);
     void einkDrawRect(int x, int y, int w, int h, bool filled = false, bool black = true);
     void einkDrawBitmap(int x, int y, const unsigned char* bitmap, int w, int h, bool black = true);
+    void einkDrawCircle(int x, int y, int r, bool filled = false, bool black = true);
+    void einkGetTextBounds(const char* text, int x, int y, int16_t* x1, int16_t* y1, uint16_t* w, uint16_t* h);
     void einkRefresh();
     void einkPartialRefresh();
     

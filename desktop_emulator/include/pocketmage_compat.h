@@ -356,27 +356,31 @@ public:
         if (g_display) g_display->einkDrawRect(x, y, w, h, true);
     }
     void drawBitmap(int x, int y, const uint8_t* bitmap, int w, int h, uint16_t color) {
-        // Mock bitmap as rectangle for now
-        if (g_display) g_display->einkDrawRect(x, y, w, h);
+        if (g_display && bitmap) {
+            g_display->einkDrawBitmap(x, y, bitmap, w, h, color == GxEPD_BLACK);
+        }
     }
     void drawPixel(int x, int y, uint16_t color) {
-        // Mock pixel drawing
+        if (g_display) g_display->einkSetPixel(x, y, color == GxEPD_BLACK);
     }
     void drawLine(int x0, int y0, int x1, int y1, uint16_t color) {
         if (g_display) g_display->einkDrawLine(x0, y0, x1, y1);
     }
     void drawCircle(int x, int y, int r, uint16_t color) {
-        // Mock circle drawing
+        if (g_display) g_display->einkDrawCircle(x, y, r, false);
     }
     void fillCircle(int x, int y, int r, uint16_t color) {
-        // Mock filled circle
+        if (g_display) g_display->einkDrawCircle(x, y, r, true);
     }
     void getTextBounds(const char* text, int x, int y, int16_t* x1, int16_t* y1, uint16_t* w, uint16_t* h) {
-        // Mock text bounds calculation
-        if (x1) *x1 = x;
-        if (y1) *y1 = y;
-        if (w) *w = text ? strlen(text) * 8 : 0;
-        if (h) *h = 16;
+        if (g_display && text) {
+            g_display->einkGetTextBounds(text, x, y, x1, y1, w, h);
+        } else {
+            if (x1) *x1 = x;
+            if (y1) *y1 = y;
+            if (w) *w = text ? strlen(text) * 8 : 0;
+            if (h) *h = 16;
+        }
     }
     void getTextBounds(const String& text, int x, int y, int16_t* x1, int16_t* y1, uint16_t* w, uint16_t* h) {
         getTextBounds(text.c_str(), x, y, x1, y1, w, h);

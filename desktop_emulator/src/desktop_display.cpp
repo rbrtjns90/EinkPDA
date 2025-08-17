@@ -233,6 +233,68 @@ void DesktopDisplay::einkDrawBitmap(int x, int y, const unsigned char* bitmap, i
     }
 }
 
+void DesktopDisplay::einkDrawCircle(int x, int y, int r, bool filled, bool black) {
+    if (filled) {
+        // Draw filled circle
+        for (int dy = -r; dy <= r; dy++) {
+            for (int dx = -r; dx <= r; dx++) {
+                if (dx*dx + dy*dy <= r*r) {
+                    einkSetPixel(x + dx, y + dy, black);
+                }
+            }
+        }
+    } else {
+        // Draw circle outline using Bresenham's circle algorithm
+        int dx = 0;
+        int dy = r;
+        int d = 3 - 2 * r;
+        
+        while (dy >= dx) {
+            // Draw 8 symmetric points
+            einkSetPixel(x + dx, y + dy, black);
+            einkSetPixel(x - dx, y + dy, black);
+            einkSetPixel(x + dx, y - dy, black);
+            einkSetPixel(x - dx, y - dy, black);
+            einkSetPixel(x + dy, y + dx, black);
+            einkSetPixel(x - dy, y + dx, black);
+            einkSetPixel(x + dy, y - dx, black);
+            einkSetPixel(x - dy, y - dx, black);
+            
+            dx++;
+            if (d > 0) {
+                dy--;
+                d = d + 4 * (dx - dy) + 10;
+            } else {
+                d = d + 4 * dx + 6;
+            }
+        }
+    }
+}
+
+void DesktopDisplay::einkGetTextBounds(const char* text, int x, int y, int16_t* x1, int16_t* y1, uint16_t* w, uint16_t* h) {
+    if (!text || !font) {
+        if (x1) *x1 = x;
+        if (y1) *y1 = y;
+        if (w) *w = text ? strlen(text) * 8 : 0;
+        if (h) *h = 16;
+        return;
+    }
+    
+    int textW, textH;
+    if (TTF_SizeText(font, text, &textW, &textH) == 0) {
+        if (x1) *x1 = x;
+        if (y1) *y1 = y - textH; // TTF coordinates are different
+        if (w) *w = textW;
+        if (h) *h = textH;
+    } else {
+        // Fallback calculation
+        if (x1) *x1 = x;
+        if (y1) *y1 = y;
+        if (w) *w = strlen(text) * 8;
+        if (h) *h = 16;
+    }
+}
+
 void DesktopDisplay::einkRefresh() {
     updateEinkTexture();
 }
