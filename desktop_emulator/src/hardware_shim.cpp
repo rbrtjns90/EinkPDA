@@ -1,14 +1,35 @@
-#include "hardware_shim.h"
+#include "pocketmage_compat.h"
 #include "desktop_display.h"
+#include "SD_MMC.h"
+#include "Wire.h"
+#include "Preferences.h"
+#include "Adafruit_TCA8418.h"
+#include "GxEPD2_BW.h"
+#include "U8g2lib.h"
+#include "Buzzer.h"
 #include <chrono>
 #include <thread>
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <algorithm>
 
 // Arduino compatibility implementations
-MockSerial Serial;
-MockSDCard SD_MMC;
+SerialClass Serial;
+SD_MMCClass SD_MMC;
+RTC_DS3231 rtc;
+TwoWire Wire;
+Preferences preferences;
+Adafruit_TCA8418 keypad;
+Buzzer buzzer;
+
+// Mock fonts
+const GFXfont FreeSerif9pt7b = {};
+const GFXfont FreeMonoBold9pt7b = {};
+
+// Mock hardware objects that PocketMage expects
+GxEPD2_BW display;
+U8G2_SH1106_128X32_VISIONOX_F_HW_I2C u8g2;
 
 unsigned long millis() {
     static auto start = std::chrono::steady_clock::now();
@@ -32,6 +53,92 @@ void delayMicroseconds(unsigned int us) {
 
 void randomSeed(unsigned long seed) {
     srand(seed);
+}
+
+uint32_t esp_random() {
+    return rand();
+}
+
+// PocketMage compatibility functions
+String removeChar(String str, char c) {
+    std::string result = str.c_str();
+    result.erase(std::remove(result.begin(), result.end(), c), result.end());
+    return String(result);
+}
+
+void listDir(SD_MMCClass& fs, const char* dirname) {
+    // Mock file listing - populate with some test files
+    std::cout << "[SD] Listing directory: " << dirname << std::endl;
+}
+
+void oledWord(const String& text) {
+    if (g_display) {
+        g_display->oledClear();
+        g_display->oledDrawText(text.c_str(), 0, 16);
+        g_display->oledUpdate();
+    }
+}
+
+void oledLine(const String& text, bool clear) {
+    if (g_display) {
+        if (clear) g_display->oledClear();
+        g_display->oledDrawText(text.c_str(), 0, 16);
+        g_display->oledUpdate();
+    }
+}
+
+void refresh() {
+    if (g_display) g_display->einkRefresh();
+}
+
+void drawStatusBar(const String& text) {
+    if (g_display) {
+        g_display->oledClear();
+        g_display->oledDrawText(text.c_str(), 0, 16);
+        g_display->oledUpdate();
+    }
+}
+
+void drawThickLine(int x0, int y0, int x1, int y1, int thickness) {
+    if (g_display) {
+        for (int i = 0; i < thickness; i++) {
+            g_display->einkDrawLine(x0 + i, y0, x1 + i, y1, true);
+            g_display->einkDrawLine(x0, y0 + i, x1, y1 + i, true);
+        }
+    }
+}
+
+// PocketMage app initialization functions (mock implementations)
+void TXT_INIT() {
+    std::cout << "[TXT] App initialized" << std::endl;
+}
+
+void FILEWIZ_INIT() {
+    std::cout << "[FILEWIZ] App initialized" << std::endl;
+}
+
+void USB_INIT() {
+    std::cout << "[USB] App initialized" << std::endl;
+}
+
+void TASKS_INIT() {
+    std::cout << "[TASKS] App initialized" << std::endl;
+}
+
+void SETTINGS_INIT() {
+    std::cout << "[SETTINGS] App initialized" << std::endl;
+}
+
+void CALENDAR_INIT() {
+    std::cout << "[CALENDAR] App initialized" << std::endl;
+}
+
+void JOURNAL_INIT() {
+    std::cout << "[JOURNAL] App initialized" << std::endl;
+}
+
+void LEXICON_INIT() {
+    std::cout << "[LEXICON] App initialized" << std::endl;
 }
 
 long random(long max) {
@@ -64,77 +171,74 @@ void MockSerial::flush() {
 // File implementation
 File::File() : isOpen(false) {}
 
-File::File(const std::string& path, const std::string& mode) : isOpen(false) {
-    std::ios::openmode openMode = std::ios::in;
-    if (mode == "w" || mode == FILE_WRITE) {
-        openMode = std::ios::out | std::ios::trunc;
-    } else if (mode == "a" || mode == FILE_APPEND) {
-        openMode = std::ios::out | std::ios::app;
-    } else if (mode == "r+" || mode == "w+") {
-        openMode = std::ios::in | std::ios::out;
+File::File(const std::string& path, const std::string& mode) : isOpen(false), filePath(path) {
+    std::string fullPath = "./data/" + path;
+    
+    if (mode.find('w') != std::string::npos || mode.find('a') != std::string::npos) {
+        outFile.open(fullPath, mode.find('a') != std::string::npos ? std::ios::app : std::ios::out);
+        isOpen = outFile.is_open();
+    } else {
+        inFile.open(fullPath);
+        isOpen = inFile.is_open();
     }
     
-    file.open(path, openMode);
-    isOpen = file.is_open();
+    if (!isOpen) {
+        std::cout << "[File] Failed to open: " << fullPath << std::endl;
+    }
 }
 
 File::~File() {
-    if (isOpen) {
-        file.close();
-    }
+    close();
 }
 
 void File::close() {
-    if (isOpen) {
-        file.close();
-        isOpen = false;
-    }
+    if (inFile.is_open()) inFile.close();
+    if (outFile.is_open()) outFile.close();
+    isOpen = false;
 }
 
 size_t File::write(const uint8_t* data, size_t len) {
-    if (!isOpen) return 0;
-    file.write(reinterpret_cast<const char*>(data), len);
-    return len;
+    if (outFile.is_open()) {
+        outFile.write(reinterpret_cast<const char*>(data), len);
+        return len;
+    }
+    return 0;
 }
 
-size_t File::write(const std::string& str) {
-    if (!isOpen) return 0;
-    file << str;
-    return str.length();
+size_t File::write(const String& str) {
+    return write(reinterpret_cast<const uint8_t*>(str.c_str()), str.length());
 }
 
 int File::read() {
-    if (!isOpen) return -1;
-    return file.get();
+    if (inFile.is_open()) {
+        return inFile.get();
+    }
+    return -1;
 }
 
 String File::readString() {
-    if (!isOpen) return String();
-    std::string content((std::istreambuf_iterator<char>(file)),
-                        std::istreambuf_iterator<char>());
-    return String(content);
+    if (inFile.is_open()) {
+        std::string content((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
+        return String(content);
+    }
+    return String();
 }
 
 String File::readStringUntil(char terminator) {
-    if (!isOpen) return String();
-    std::string line;
-    std::getline(file, line, terminator);
-    return String(line);
+    std::string result;
+    if (inFile.is_open()) {
+        std::getline(inFile, result, terminator);
+    }
+    return String(result);
 }
 
 bool File::available() {
-    return isOpen && !file.eof();
+    return inFile.is_open() && inFile.good() && inFile.peek() != EOF;
 }
 
 void File::seek(size_t pos) {
-    if (isOpen) {
-        file.seekg(pos);
-        file.seekp(pos);
-    }
-}
-
-size_t File::position() {
-    return isOpen ? static_cast<size_t>(file.tellg()) : 0;
+    if (inFile.is_open()) inFile.seekg(pos);
+    if (outFile.is_open()) outFile.seekp(pos);
 }
 
 size_t File::size() {

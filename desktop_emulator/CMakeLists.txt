@@ -28,8 +28,20 @@ include_directories(${POCKETMAGE_INCLUDE})
 include_directories(${SDL2_INCLUDE_DIRS})
 include_directories(${SDL2_TTF_INCLUDE_DIRS})
 
-# PocketMage source files - we'll extract what we need manually
-# set(POCKETMAGE_SOURCES)
+# PocketMage source files (actual app code)
+set(POCKETMAGE_SOURCES
+    ${POCKETMAGE_SRC}/globals.cpp
+    ${POCKETMAGE_SRC}/assets.cpp
+    ${POCKETMAGE_SRC}/HOME.cpp
+    ${POCKETMAGE_SRC}/TXT.cpp
+    ${POCKETMAGE_SRC}/FILEWIZ.cpp
+    ${POCKETMAGE_SRC}/TASKS.cpp
+    ${POCKETMAGE_SRC}/CALENDAR.cpp
+    ${POCKETMAGE_SRC}/settings.cpp
+    ${POCKETMAGE_SRC}/USB.cpp
+    ${POCKETMAGE_SRC}/JOURNAL.cpp
+    ${POCKETMAGE_SRC}/LEXICON.cpp
+)
 
 # Desktop emulator source files
 set(EMULATOR_SOURCES
@@ -41,6 +53,7 @@ set(EMULATOR_SOURCES
 # Create executable
 add_executable(${PROJECT_NAME} 
     ${EMULATOR_SOURCES}
+    ${POCKETMAGE_SOURCES}
 )
 
 # Link libraries
