@@ -33,6 +33,7 @@ set(POCKETMAGE_SOURCES
     ${POCKETMAGE_SRC}/globals.cpp
     ${POCKETMAGE_SRC}/assets.cpp
     ../Code/PocketMage_V3/src/sysFunc.cpp
+    ${POCKETMAGE_SRC}/PocketMageV3.cpp
     # ../Code/PocketMage_V3/src/USB.cpp  # Excluded - requires ESP32-specific headers
     ${POCKETMAGE_SRC}/TXT.cpp
     ${POCKETMAGE_SRC}/FILEWIZ.cpp

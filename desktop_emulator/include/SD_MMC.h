@@ -63,6 +63,8 @@ public:
     bool rename(const String& path1, const String& path2);
     uint64_t totalBytes() { return 1024 * 1024 * 1024; } // 1GB mock
     uint64_t usedBytes() { return 512 * 1024 * 1024; }   // 512MB mock
+    void setPins(int clk, int cmd, int d0, int d1 = -1, int d2 = -1, int d3 = -1) {}
+    sdcard_type_t cardType() { return CARD_SD; }
 };
 
 extern SD_MMCClass SD_MMC;

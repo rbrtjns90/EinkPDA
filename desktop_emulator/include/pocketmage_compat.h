@@ -204,12 +204,15 @@ class SerialClass {
 public:
     void begin(int baud) {}
     void println(const String& str) { std::cout << "[Serial] " << str.c_str() << std::endl; }
+    void println(const char* str) { std::cout << "[Serial] " << str << std::endl; }
     void println() { std::cout << "[Serial] " << std::endl; }
     void print(const String& str) { std::cout << "[Serial] " << str.c_str(); }
+    void print(const char* str) { std::cout << "[Serial] " << str; }
     void print(int val) { std::cout << "[Serial] " << val; }
     void print(float val, int precision = 2) { std::cout << "[Serial] " << std::fixed << std::setprecision(precision) << val; }
     void printf(const char* format, ...) { std::cout << "[Serial] printf" << std::endl; }
     void write(int val) { std::cout << "[Serial] " << (char)val; }
+    void flush() {}
 };
 extern SerialClass Serial;
 
@@ -220,6 +223,7 @@ class TimeSpan;
 class DateTime {
 public:
     DateTime() {}
+    DateTime(const char* date, const char* time) {} // Constructor for F(__DATE__), F(__TIME__)
     DateTime(int year, int month, int day) {}
     DateTime(int year, int month, int day, int hour, int minute, int second) {}
     int year() const { return 2025; }
@@ -242,6 +246,8 @@ public:
     bool begin() { return true; }
     DateTime now() { return DateTime(); }
     void adjust(const DateTime& dt) {}
+    void start() {}
+    bool lostPower() { return false; }
 };
 extern RTC_DS3231 rtc;
 
@@ -255,11 +261,46 @@ int digitalRead(uint8_t pin);
 void digitalWrite(uint8_t pin, uint8_t value);
 int analogRead(uint8_t pin);
 
+// ESP32 Pin definitions - only non-conflicting ones
+#define INPUT_PULLUP 0x02
+// Interrupt mode constants
+#define CHANGE 1
+#define FALLING 2
+#define RISING 3
+// All other pins removed - let config.h define them
+#define MPR121_ADDR 0x5A
+#define TCA8418_DEFAULT_ADDR 0x34
+#ifndef LED_BUILTIN
+#define LED_BUILTIN 2
+#endif
+
 // PocketMage specific functions that need to be mocked
 void listDir(SD_MMCClass& fs, const char* dirname);
 void refresh();
 void drawThickLine(int x0, int y0, int x1, int y1, int thickness);
 String removeChar(String str, char c);
+void playJingle(const char* name);
+void oledWord(const char* text, bool clear = true, bool send = true);
+void processKB();
+void checkTimeout();
+void printDebug();
+void updateBattState();
+void TCA8418_irq();
+void PWR_BTN_irq();
+
+// Musical note definitions
+#define NOTE_A8 4435
+#define NOTE_B8 4978
+#define NOTE_C8 4186
+#define NOTE_D8 4699
+
+// PocketMage configuration constants
+extern bool SET_CLOCK_ON_UPLOAD;
+extern bool DEBUG_VERBOSE;
+extern bool noTimeout;
+extern bool SAVE_POWER;
+extern String SLEEPMODE;
+extern String editingFile;
 
 // PocketMage app initialization functions
 void TXT_INIT();
@@ -273,6 +314,110 @@ void LEXICON_INIT();
 
 // ESP32 CPU frequency control
 void setCpuFrequencyMhz(uint32_t freq);
+
+// ESP32 Task and FreeRTOS functions
+typedef void* TaskHandle_t;
+typedef void (*TaskFunction_t)(void*);
+typedef int BaseType_t;
+typedef unsigned int UBaseType_t;
+#define portTICK_PERIOD_MS 1
+#define pdPASS 1
+#define pdFAIL 0
+// xTaskCreatePinnedToCore removed - let real FreeRTOS headers define it
+void vTaskDelay(uint32_t ticks);
+void vTaskDelete(void* handle);
+void yield();
+
+// ESP32 Sleep functions
+typedef enum {
+    ESP_SLEEP_WAKEUP_UNDEFINED,
+    ESP_SLEEP_WAKEUP_EXT0,
+    ESP_SLEEP_WAKEUP_EXT1,
+    ESP_SLEEP_WAKEUP_TIMER,
+    ESP_SLEEP_WAKEUP_TOUCHPAD,
+    ESP_SLEEP_WAKEUP_ULP
+} esp_sleep_wakeup_cause_t;
+
+typedef enum {
+    GPIO_NUM_0 = 0,
+    GPIO_NUM_1 = 1,
+    GPIO_NUM_2 = 2,
+    GPIO_NUM_3 = 3,
+    GPIO_NUM_4 = 4,
+    GPIO_NUM_5 = 5,
+    GPIO_NUM_6 = 6,
+    GPIO_NUM_7 = 7,
+    GPIO_NUM_8 = 8,
+    GPIO_NUM_9 = 9,
+    GPIO_NUM_10 = 10,
+    GPIO_NUM_11 = 11,
+    GPIO_NUM_12 = 12,
+    GPIO_NUM_13 = 13,
+    GPIO_NUM_14 = 14,
+    GPIO_NUM_15 = 15,
+    GPIO_NUM_16 = 16,
+    GPIO_NUM_17 = 17,
+    GPIO_NUM_18 = 18,
+    GPIO_NUM_19 = 19,
+    GPIO_NUM_20 = 20,
+    GPIO_NUM_21 = 21,
+    GPIO_NUM_MAX = 40
+} gpio_num_t;
+
+void esp_sleep_enable_ext0_wakeup(gpio_num_t gpio_num, int level);
+esp_sleep_wakeup_cause_t esp_sleep_get_wakeup_cause();
+void esp_deep_sleep_start();
+
+// ESP32 Interrupt functions
+void attachInterrupt(uint8_t pin, void (*ISR)(void), int mode);
+void detachInterrupt(uint8_t pin);
+int digitalPinToInterrupt(uint8_t pin);
+
+// ESP32 Wire/I2C
+// TwoWire class removed - let real Wire.h define it
+
+// ESP32 SPI
+class SPIClass {
+public:
+    void begin(int8_t sck = -1, int8_t miso = -1, int8_t mosi = -1, int8_t ss = -1) {}
+    void end() {}
+    void beginTransaction(uint32_t settings) {}
+    void endTransaction() {}
+    uint8_t transfer(uint8_t data) { return data; }
+    void transfer(void* buf, size_t count) {}
+};
+extern SPIClass SPI;
+
+// ESP32 Card types
+typedef enum {
+    CARD_NONE,
+    CARD_MMC,
+    CARD_SD,
+    CARD_SDHC,
+    CARD_UNKNOWN
+} sdcard_type_t;
+
+// Additional ESP32 hardware classes
+// Adafruit_MPR121 class removed - let real headers define it
+
+// Preferences class removed - let real ESP32 headers define it
+
+// Buzzer class removed - let real PocketMage Buzzer.h define it
+
+// TimeSpan implementation
+class TimeSpan {
+public:
+    TimeSpan(int32_t seconds = 0) : _seconds(seconds) {}
+    TimeSpan(int32_t days, int32_t hours, int32_t minutes, int32_t seconds) 
+        : _seconds(days * 86400 + hours * 3600 + minutes * 60 + seconds) {}
+    int32_t totalseconds() const { return _seconds; }
+    int32_t days() const { return _seconds / 86400; }
+    int32_t hours() const { return (_seconds % 86400) / 3600; }
+    int32_t minutes() const { return (_seconds % 3600) / 60; }
+    int32_t seconds() const { return _seconds % 60; }
+private:
+    int32_t _seconds;
+};
 
 // std::min and std::max compatibility
 template<typename T>
@@ -403,28 +548,7 @@ extern GxEPD2_BW<GxEPD2_310_GDEQ031T10, GxEPD2_310_GDEQ031T10::HEIGHT> display;
 
 typedef U8G2_SH1106_128X32_VISIONOX_F_HW_I2C U8G2_SSD1326_ER_256X32_F_4W_HW_SPI;
 
-// ESP32 pin constants (will be overridden by config.h if present)
-#ifndef EPD_CS
-#define EPD_CS 5
-#endif
-#ifndef EPD_DC
-#define EPD_DC 17
-#endif
-#ifndef EPD_RST
-#define EPD_RST 16
-#endif
-#ifndef EPD_BUSY
-#define EPD_BUSY 4
-#endif
-#ifndef OLED_CS
-#define OLED_CS 15
-#endif
-#ifndef OLED_DC
-#define OLED_DC 2
-#endif
-#ifndef OLED_RST
-#define OLED_RST 0
-#endif
+// All pin constants removed - let config.h define them
 #define U8G2_R2 2
 
 // Musical note constants
@@ -446,15 +570,7 @@ inline void esp_deep_sleep_start() { /* Mock deep sleep */ }
 // TCA8418 register constants
 #define TCA8418_REG_INT_STAT 0x02
 
-// TimeSpan class for DateTime calculations
-class TimeSpan {
-public:
-    TimeSpan(int days, int hours, int minutes, int seconds) {}
-    int days() const { return 0; }
-    int hours() const { return 0; }
-    int minutes() const { return 0; }
-    int seconds() const { return 0; }
-};
+// TimeSpan class already defined above
 
 // DateTime operator implementations
 inline DateTime DateTime::operator-(const TimeSpan& ts) const {

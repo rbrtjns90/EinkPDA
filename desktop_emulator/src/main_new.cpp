@@ -9,9 +9,29 @@ enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOUR
 // Desktop emulator globals
 DesktopDisplay* g_display = nullptr;
 
-// Forward declare real PocketMage functions
-extern void setup();
-extern void loop();
+// Forward declarations for real PocketMage functions
+void setup();
+void loop();
+
+// Forward declarations for real PocketMage display handlers
+void einkHandler_HOME();
+void einkHandler_TXT();
+void einkHandler_FILEWIZ();
+void einkHandler_USB();
+void einkHandler_TASKS();
+void einkHandler_SETTINGS();
+void einkHandler_CALENDAR();
+void einkHandler_JOURNAL();
+void einkHandler_LEXICON();
+
+// Forward declare PocketMage initialization functions
+extern void TXT_INIT();
+extern void FILEWIZ_INIT();
+extern void TASKS_INIT();
+extern void SETTINGS_INIT();
+extern void CALENDAR_INIT();
+extern void JOURNAL_INIT();
+extern void LEXICON_INIT();
 
 // Emulator-specific setup
 void emulatorSetup() {

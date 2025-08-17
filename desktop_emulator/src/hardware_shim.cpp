@@ -12,18 +12,14 @@ enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOUR
 #include "U8g2lib.h"
 #include "Buzzer.h"
 #include "USB.h"
-#include "USBMSC.h"
-#include <chrono>
-#include <thread>
-#include <iostream>
-#include <fstream>
-#include <filesystem>
-#include <algorithm>
 
-// Arduino compatibility implementations
+// Arduino compatibility implementations - duplicates removed
 SerialClass Serial;
+// rtc, u8g2, keypad are defined in real PocketMage globals.cpp
 SD_MMCClass SD_MMC;
 TwoWire Wire;
+SPIClass SPI;
+// cap and prefs are defined in real PocketMage globals.cpp
 
 // NOTE:
 // The real PocketMage globals (display, u8g2, rtc, keypad, buzzer, prefs, etc.)
@@ -91,7 +87,45 @@ void drawThickLine(int x0, int y0, int x1, int y1, int thickness) {
 
 // ESP32 CPU frequency control mock
 void setCpuFrequencyMhz(uint32_t freq) {
-    // Mock implementation - does nothing on desktop
+    // Mock CPU frequency control
+}
+
+// ESP32 Task and FreeRTOS functions
+void xTaskCreatePinnedToCore(TaskFunction_t taskFunction, const char* taskName, uint32_t stackSize, void* parameters, uint32_t priority, TaskHandle_t* taskHandle, uint32_t coreId) {
+    // Mock task creation - in emulator we'll call the task function directly when needed
+    std::cout << "[Task] Created task: " << taskName << std::endl;
+}
+
+void vTaskDelay(uint32_t ticks) {
+    delay(ticks); // Convert to regular delay
+}
+
+void yield() {
+    // Mock yield - do nothing in emulator
+}
+
+// ESP32 Sleep functions
+void esp_sleep_enable_ext0_wakeup(gpio_num_t gpio_num, int level) {
+    std::cout << "[Sleep] Enabled ext0 wakeup on GPIO " << gpio_num << std::endl;
+}
+
+esp_sleep_wakeup_cause_t esp_sleep_get_wakeup_cause() {
+    return ESP_SLEEP_WAKEUP_UNDEFINED;
+}
+
+// esp_deep_sleep_start already defined in pocketmage_compat.h
+
+// ESP32 Interrupt functions
+void attachInterrupt(uint8_t pin, void (*ISR)(void), int mode) {
+    std::cout << "[Interrupt] Attached interrupt to pin " << (int)pin << std::endl;
+}
+
+void detachInterrupt(uint8_t pin) {
+    std::cout << "[Interrupt] Detached interrupt from pin " << (int)pin << std::endl;
+}
+
+int digitalPinToInterrupt(uint8_t pin) {
+    return pin; // Simple mapping for emulator
 }
 
 // Function signature compatibility removed - using real app implementation
@@ -100,6 +134,25 @@ void setCpuFrequencyMhz(uint32_t freq) {
 void USB_INIT() {
     std::cout << "[USB] App initialized" << std::endl;
 }
+
+// PocketMage specific function implementations
+void playJingle(const char* name) {
+    std::cout << "[Audio] Playing jingle: " << name << std::endl;
+}
+
+void oledWord(const char* text, bool clear, bool send) {
+    if (clear && g_display) g_display->oledClear();
+    if (text && g_display) {
+        g_display->oledDrawText(text, 0, 0, 8);
+    }
+    if (send && g_display) g_display->oledUpdate();
+}
+
+// Duplicate functions removed - implemented in real PocketMage source
+
+// PocketMage configuration constants - duplicates removed, defined in real PocketMage globals.cpp
+bool SET_CLOCK_ON_UPLOAD = false;
+String SLEEPMODE = "NORMAL";
 
 // useFastFullUpdate is defined in real PocketMage globals.cpp
 
@@ -319,11 +372,13 @@ void pinMode(uint8_t pin, uint8_t mode) {}
 int digitalRead(uint8_t pin) { return 0; }
 void digitalWrite(uint8_t pin, uint8_t value) {}
 int analogRead(uint8_t pin) { return 512; }
-void attachInterrupt(uint8_t pin, void (*callback)(), int mode) {}
-void xTaskCreatePinnedToCore(void (*task)(void*), const char* name, 
-    uint32_t stackSize, void* params, uint8_t priority, 
-    void** handle, uint8_t core) {}
-void vTaskDelay(uint32_t ticks) { delay(ticks); }
+BaseType_t xTaskCreatePinnedToCore(void (*pvTaskCode)(void*), const char* const pcName,
+                                  const uint32_t ulStackDepth, void* const pvParameters,
+                                  UBaseType_t uxPriority, TaskHandle_t* const pvCreatedTask,
+                                  const BaseType_t xCoreID) {
+    std::cout << "[FreeRTOS] Created task: " << pcName << " on core " << xCoreID << std::endl;
+    return pdPASS;
+}
 // yield() already defined in esp32_shims.h
 void esp_sleep_enable_ext0_wakeup(uint8_t pin, int level) {}
 // esp_deep_sleep_start is already defined in pocketmage_compat.h
@@ -389,13 +444,9 @@ bool SD_MMCClass::rename(const String& path1, const String& path2) {
 }
 
 // Missing function stubs for linker
-int countLines(String content, unsigned long maxLines) {
-    int lines = 1;
-    for (size_t i = 0; i < content.length() && lines < maxLines; i++) {
-        if (content.charAt(i) == '\n') lines++;
-    }
-    return lines;
-}
+// removeChar function removed - implemented in real PocketMage source
+
+// refresh() function removed - already defined earlier
 
 void oledScroll() {
     // Mock OLED scroll function
@@ -411,6 +462,40 @@ void vTaskDelete(void* handle) {
 
 void drawStatusBar(String status) {
     std::cout << "[StatusBar] " << status.c_str() << std::endl;
+}
+
+// Missing functions for linker
+int countLines(String text, unsigned long maxWidth) {
+    // Simple line counting implementation
+    int lines = 1;
+    for (size_t i = 0; i < text.length(); i++) {
+        if (text.charAt(i) == '\n') {
+            lines++;
+        }
+    }
+    return lines;
+}
+
+// Forward declaration
+void applicationEinkHandler();
+
+void einkHandler(void* parameter) {
+    // Mock FreeRTOS task - call applicationEinkHandler in loop
+    while (true) {
+        applicationEinkHandler();
+        vTaskDelay(50);
+        yield();
+    }
+}
+
+void processKB_USB() {
+    // Mock USB keyboard processing
+    std::cout << "[USB] Processing keyboard input" << std::endl;
+}
+
+void einkHandler_USB() {
+    // Mock USB handler
+    std::cout << "[Display] USB handler called" << std::endl;
 }
 
 void einkTextDynamic(bool refresh, bool clear) {
@@ -435,28 +520,4 @@ void oledWord(String text, bool center, bool newline) {
 
 void statusBar(String text, bool refresh) {
     std::cout << "[StatusBar] " << text.c_str() << " refresh=" << refresh << std::endl;
-}
-
-// Arduino-style setup and loop functions for emulator
-void setup() {
-    Serial.begin(115200);
-    Serial.println("PocketMage Desktop Emulator Starting...");
-    
-    // Initialize mock SD card
-    SD_MMC.begin();
-    
-    // Initialize PocketMage state variables that are expected by the real code
-    extern volatile bool newState;
-    extern AppState CurrentAppState;
-    
-    newState = true;
-    CurrentAppState = HOME;  // Start in HOME state
-    
-    Serial.println("Setup complete!");
-}
-
-void loop() {
-    // Simple main loop - just handle basic state
-    // The real app logic is handled by the desktop display callbacks
-    delay(10);
 }
