@@ -2,7 +2,7 @@
 #include <iostream>
 #include <cstring>
 
-DesktopDisplay* g_display = nullptr;
+// g_display is defined in main_new.cpp
 
 DesktopDisplay::DesktopDisplay() 
     : einkWindow(nullptr), oledWindow(nullptr), 

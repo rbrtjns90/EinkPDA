@@ -32,20 +32,21 @@ include_directories(${SDL2_TTF_INCLUDE_DIRS})
 set(POCKETMAGE_SOURCES
     ${POCKETMAGE_SRC}/globals.cpp
     ${POCKETMAGE_SRC}/assets.cpp
-    ${POCKETMAGE_SRC}/HOME.cpp
+    ../Code/PocketMage_V3/src/sysFunc.cpp
+    # ../Code/PocketMage_V3/src/USB.cpp  # Excluded - requires ESP32-specific headers
     ${POCKETMAGE_SRC}/TXT.cpp
     ${POCKETMAGE_SRC}/FILEWIZ.cpp
     ${POCKETMAGE_SRC}/TASKS.cpp
     ${POCKETMAGE_SRC}/CALENDAR.cpp
     ${POCKETMAGE_SRC}/settings.cpp
-    ${POCKETMAGE_SRC}/USB.cpp
+    ${POCKETMAGE_SRC}/HOME.cpp
     ${POCKETMAGE_SRC}/JOURNAL.cpp
     ${POCKETMAGE_SRC}/LEXICON.cpp
 )
 
 # Desktop emulator source files
 set(EMULATOR_SOURCES
-    src/main.cpp
+    src/main_new.cpp
     src/desktop_display.cpp
     src/hardware_shim.cpp
 )

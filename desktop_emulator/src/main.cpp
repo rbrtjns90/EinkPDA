@@ -1,179 +1,25 @@
 #include "pocketmage_compat.h"
 #include "desktop_display.h"
+#include "SD_MMC.h"
+#include "freertos/task.h"
 #include <iostream>
 #include <vector>
 #include <string>
 #include <cstring>
 
-// Include actual PocketMage headers
-#include "globals.h"
-#include "assets.h"
+// Include real PocketMage globals
+#include "../Code/PocketMage_V3/include/globals.h"
 
-// Mock config values since we can't include the original config.h
-#define TXT_APP_STYLE 0
-#define MAX_FILES 100
-#define SET_CLOCK_ON_UPLOAD false
-
-// Mock the hardware objects that the original code expects
-MockGxEPD2 display;
-MockU8G2 u8g2;
-MockKeypad keypad;
-MockBuzzer buzzer;
-MockMPR121 cap;
-MockRTC rtc;
-MockPreferences prefs;
-
-// Mock the global variables from globals.h
-volatile int einkRefresh = 0;
-int OLEDFPSMillis = 0;
-int KBBounceMillis = 0;
-volatile int timeoutMillis = 0;
-volatile int prevTimeMillis = 0;
-volatile bool TCA8418_event = false;
-volatile bool PWR_BTN_event = false;
-volatile bool SHFT = false;
-volatile bool FN = false;
-volatile bool newState = false;
-bool noTimeout = false;
-volatile bool OLEDPowerSave = false;
-volatile bool disableTimeout = false;
-volatile int battState = 100;
-volatile int prevBattState = 100;
-unsigned int flashMillis = 0;
-int prevTime = 0;
-uint8_t prevSec = 0;
-TaskHandle_t einkHandlerTaskHandle = nullptr;
-char currentKB[4][10];
-volatile bool SDCARD_INSERT = true;
-bool noSD = false;
-volatile bool SDActive = true;
-
-// Keyboard arrays
-char keysArray[4][10] = {
-    {'1', '2', '3', '4', '5', '6', '7', '8', '9', '0'},
-    {'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'},
-    {'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';'},
-    {'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/'}
-};
-
-char keysArraySHFT[4][10] = {
-    {'!', '@', '#', '$', '%', '^', '&', '*', '(', ')'},
-    {'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'},
-    {'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':'},
-    {'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?'}
-};
-
-char keysArrayFN[4][10] = {
-    {'1', '2', '3', '4', '5', '6', '7', '8', '9', '0'},
-    {'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'},
-    {'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';'},
-    {'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/'}
-};
-
-// Enum states
-enum KBState { NORMAL, SHIFT, FUNC };
-KBState CurrentKBState = NORMAL;
-
-enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
-AppState CurrentAppState = HOME;
-
-const String appStateNames[] = {"HOME", "TXT", "FILEWIZ", "USB_APP", "BT", "SETTINGS", "TASKS", "CALENDAR", "JOURNAL", "LEXICON"};
-
-uint8_t partialCounter = 0;
-volatile bool forceSlowFullUpdate = false;
-
-// Settings variables
-int TIMEOUT = 30;
-bool DEBUG_VERBOSE = false;
-bool SYSTEM_CLOCK = true;
-bool SHOW_YEAR = false;
-bool SAVE_POWER = false;
-bool ALLOW_NO_MICROSD = true;
-bool HOME_ON_BOOT = true;
-int OLED_BRIGHTNESS = 255;
-int OLED_MAX_FPS = 30;
-
-// TXT app variables
-String currentWord = "";
-String allText = "";
-String prevAllText = "";
-String prevLastLine = "";
-bool prevBKSP = false;
-int scroll = 0;
-int lines = 0;
-String outLines[13];
-String lines_prev[13];
-String filesList[100]; // MAX_FILES not defined, using 100
-uint8_t fileIndex = 0;
-String editingFile = "";
-String prevEditingFile = "";
-String excludedFiles[3] = {"", "", ""};
-
-enum TXTState { TXT_, WIZ0, WIZ1, WIZ2, WIZ3, FONT };
-TXTState CurrentTXTState = TXT_;
-
-String currentLine = "";
-const void* currentFont = nullptr;
-uint8_t maxCharsPerLine = 29;
-uint8_t maxLines = 13;
-uint8_t fontHeight = 10;
-uint8_t lineSpacing = 2;
-volatile bool newLineAdded = false;
-volatile bool doFull = false;
-std::vector<String> allLines;
-volatile long int dynamicScroll = 0;
-volatile long int prev_dynamicScroll = 0;
-int lastTouch = 0;
-unsigned long lastTouchTime = 0;
-
-// Other app state variables
-std::vector<std::vector<String>> tasks;
-uint8_t selectedTask = 0;
-
-enum TasksState { TASKS0, TASKS0_NEWTASK, TASKS1, TASKS1_EDITTASK };
-TasksState CurrentTasksState = TASKS0;
-
-uint8_t newTaskState = 0;
-uint8_t editTaskState = 0;
-String newTaskName = "";
-String newTaskDueDate = "";
-
-enum HOMEState { HOME_HOME, NOWLATER };
-HOMEState CurrentHOMEState = HOME_HOME;
-
-enum FileWizState { WIZ0_, WIZ1_, WIZ1_YN, WIZ2_R, WIZ2_C, WIZ3_ };
-FileWizState CurrentFileWizState = WIZ0_;
-String workingFile = "";
-
-enum SettingsState { settings0, settings1 };
-SettingsState CurrentSettingsState = settings0;
-
-enum CalendarState { WEEK, MONTH, NEW_EVENT, VIEW_EVENT, SUN, MON, TUE, WED, THU, FRI, SAT };
-CalendarState CurrentCalendarState = WEEK;
-
-enum LexState {MENU, DEF};
-LexState CurrentLexState = MENU;
-
-enum JournalState {J_MENU, J_TXT};
-JournalState CurrentJournalState = J_MENU;
-
-// RTC constants
-const char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+// Desktop emulator globals
+DesktopDisplay* g_display = nullptr;
 
 // Simple keyboard input handler for desktop
 char lastInputChar = 0;
 bool keyboardInputAvailable = false;
 
-// Forward declarations
-void applicationEinkHandler();
-void processKB();
-void processKB_FILEWIZ();
-void processKB_TASKS();
-void processKB_CALENDAR();
-void processKB_SETTINGS();
-void processKB_USB();
-void processKB_JOURNAL();
-void processKB_LEXICON();
+// Forward declarations for emulator-specific functions
+void emulatorSetup();
+void emulatorLoop();
 
 char updateKeypress() {
     if (!g_display) return 0;

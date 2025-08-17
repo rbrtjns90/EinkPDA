@@ -4,9 +4,15 @@
 #include "Wire.h"
 #include "Preferences.h"
 #include "Adafruit_TCA8418.h"
+#include "Adafruit_GFX.h"
+
+// Include AppState enum definition
+enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
 #include "GxEPD2_BW.h"
 #include "U8g2lib.h"
 #include "Buzzer.h"
+#include "USB.h"
+#include "USBMSC.h"
 #include <chrono>
 #include <thread>
 #include <iostream>
@@ -17,19 +23,13 @@
 // Arduino compatibility implementations
 SerialClass Serial;
 SD_MMCClass SD_MMC;
-RTC_DS3231 rtc;
 TwoWire Wire;
-Preferences preferences;
-Adafruit_TCA8418 keypad;
-Buzzer buzzer;
 
-// Mock fonts
-const GFXfont FreeSerif9pt7b = {};
-const GFXfont FreeMonoBold9pt7b = {};
-
-// Mock hardware objects that PocketMage expects
-GxEPD2_BW display;
-U8G2_SH1106_128X32_VISIONOX_F_HW_I2C u8g2;
+// NOTE:
+// The real PocketMage globals (display, u8g2, rtc, keypad, buzzer, prefs, etc.)
+// are defined in Code/PocketMage_V3/src/globals.cpp and declared in
+// Code/PocketMage_V3/include/globals.h. We must NOT define them here to avoid
+// duplicate symbol linker errors.
 
 unsigned long millis() {
     static auto start = std::chrono::steady_clock::now();
@@ -59,17 +59,7 @@ uint32_t esp_random() {
     return rand();
 }
 
-// PocketMage compatibility functions
-String removeChar(String str, char c) {
-    std::string result = str.c_str();
-    result.erase(std::remove(result.begin(), result.end(), c), result.end());
-    return String(result);
-}
-
-void listDir(SD_MMCClass& fs, const char* dirname) {
-    // Mock file listing - populate with some test files
-    std::cout << "[SD] Listing directory: " << dirname << std::endl;
-}
+// PocketMage compatibility functions - removeChar is defined in real PocketMage source
 
 void oledWord(const String& text) {
     if (g_display) {
@@ -91,55 +81,27 @@ void refresh() {
     if (g_display) g_display->einkRefresh();
 }
 
-void drawStatusBar(const String& text) {
-    if (g_display) {
-        g_display->oledClear();
-        g_display->oledDrawText(text.c_str(), 0, 16);
-        g_display->oledUpdate();
-    }
-}
-
 void drawThickLine(int x0, int y0, int x1, int y1, int thickness) {
     if (g_display) {
         for (int i = 0; i < thickness; i++) {
             g_display->einkDrawLine(x0 + i, y0, x1 + i, y1, true);
-            g_display->einkDrawLine(x0, y0 + i, x1, y1 + i, true);
         }
     }
 }
 
-// PocketMage app initialization functions (mock implementations)
-void TXT_INIT() {
-    std::cout << "[TXT] App initialized" << std::endl;
+// ESP32 CPU frequency control mock
+void setCpuFrequencyMhz(uint32_t freq) {
+    // Mock implementation - does nothing on desktop
 }
 
-void FILEWIZ_INIT() {
-    std::cout << "[FILEWIZ] App initialized" << std::endl;
-}
+// Function signature compatibility removed - using real app implementation
 
+// Only USB_INIT is missing from real PocketMage source
 void USB_INIT() {
     std::cout << "[USB] App initialized" << std::endl;
 }
 
-void TASKS_INIT() {
-    std::cout << "[TASKS] App initialized" << std::endl;
-}
-
-void SETTINGS_INIT() {
-    std::cout << "[SETTINGS] App initialized" << std::endl;
-}
-
-void CALENDAR_INIT() {
-    std::cout << "[CALENDAR] App initialized" << std::endl;
-}
-
-void JOURNAL_INIT() {
-    std::cout << "[JOURNAL] App initialized" << std::endl;
-}
-
-void LEXICON_INIT() {
-    std::cout << "[LEXICON] App initialized" << std::endl;
-}
+// useFastFullUpdate is defined in real PocketMage globals.cpp
 
 long random(long max) {
     return rand() % max;
@@ -150,36 +112,46 @@ long random(long min, long max) {
 }
 
 // MockSerial implementation
-void MockSerial::begin(unsigned long baud) {
-    std::cout << "[Serial] Begin at " << baud << " baud" << std::endl;
-}
-
-void MockSerial::print(const std::string& str) {
-    std::cout << str;
-}
-
-void MockSerial::println(const std::string& str) {
-    std::cout << str << std::endl;
-}
-
-void MockSerial::flush() {
-    std::cout.flush();
-}
+// SerialClass methods are implemented in the class definition
 
 // String implementation removed - using std::string directly
 
 // File implementation
-File::File() : isOpen(false) {}
+File::File() : inFile(nullptr), outFile(nullptr), isOpen(false), isDir(false), dirIndex(0) {}
 
-File::File(const std::string& path, const std::string& mode) : isOpen(false), filePath(path) {
+File::File(const std::string& path, const std::string& mode) : inFile(nullptr), outFile(nullptr), isOpen(false), isDir(false), filePath(path), dirIndex(0) {
     std::string fullPath = "./data/" + path;
-    
-    if (mode.find('w') != std::string::npos || mode.find('a') != std::string::npos) {
-        outFile.open(fullPath, mode.find('a') != std::string::npos ? std::ios::app : std::ios::out);
-        isOpen = outFile.is_open();
-    } else {
-        inFile.open(fullPath);
-        isOpen = inFile.is_open();
+    // Normalize directory flag
+    try {
+        std::filesystem::path p(fullPath);
+        if (std::filesystem::exists(p) && std::filesystem::is_directory(p)) {
+            // Directory handle
+            isDir = true;
+            isOpen = true;
+            // Build directory listing (files only, to mirror Arduino FS behavior used)
+            dirIndex = 0;
+            dirEntries.clear();
+            for (auto& entry : std::filesystem::directory_iterator(p)) {
+                if (entry.is_regular_file()) {
+                    dirEntries.push_back(entry.path().filename().string());
+                }
+            }
+        } else {
+            isDir = false;
+            // Open file
+            if (mode == "r" || mode == FILE_READ) {
+                inFile = std::make_unique<std::ifstream>(fullPath);
+                isOpen = inFile->is_open();
+            } else if (mode == "w" || mode == FILE_WRITE) {
+                outFile = std::make_unique<std::ofstream>(fullPath);
+                isOpen = outFile->is_open();
+            } else if (mode == "a" || mode == FILE_APPEND) {
+                outFile = std::make_unique<std::ofstream>(fullPath, std::ios::app);
+                isOpen = outFile->is_open();
+            }
+        }
+    } catch (...) {
+        isOpen = false;
     }
     
     if (!isOpen) {
@@ -188,21 +160,59 @@ File::File(const std::string& path, const std::string& mode) : isOpen(false), fi
 }
 
 File::~File() {
-    close();
+    if (inFile && inFile->is_open()) inFile->close();
+    if (outFile && outFile->is_open()) outFile->close();
+}
+
+// Move constructor
+File::File(File&& other) noexcept
+    : inFile(std::move(other.inFile))
+    , outFile(std::move(other.outFile))
+    , isOpen(other.isOpen)
+    , isDir(other.isDir)
+    , filePath(std::move(other.filePath))
+    , dirEntries(std::move(other.dirEntries))
+    , dirIndex(other.dirIndex)
+{
+    other.isOpen = false;
+    other.isDir = false;
+    other.dirIndex = 0;
+}
+
+// Move assignment operator
+File& File::operator=(File&& other) noexcept {
+    if (this != &other) {
+        // Close current files
+        if (inFile && inFile->is_open()) inFile->close();
+        if (outFile && outFile->is_open()) outFile->close();
+        
+        // Move from other
+        inFile = std::move(other.inFile);
+        outFile = std::move(other.outFile);
+        isOpen = other.isOpen;
+        isDir = other.isDir;
+        filePath = std::move(other.filePath);
+        dirEntries = std::move(other.dirEntries);
+        dirIndex = other.dirIndex;
+        
+        // Reset other
+        other.isOpen = false;
+        other.isDir = false;
+        other.dirIndex = 0;
+    }
+    return *this;
 }
 
 void File::close() {
-    if (inFile.is_open()) inFile.close();
-    if (outFile.is_open()) outFile.close();
+    if (inFile && inFile->is_open()) inFile->close();
+    if (outFile && outFile->is_open()) outFile->close();
     isOpen = false;
 }
 
 size_t File::write(const uint8_t* data, size_t len) {
-    if (outFile.is_open()) {
-        outFile.write(reinterpret_cast<const char*>(data), len);
-        return len;
-    }
-    return 0;
+    if (!outFile || !outFile->is_open() || !data) return 0;
+    outFile->write(reinterpret_cast<const char*>(data), len);
+    return len;
 }
 
 size_t File::write(const String& str) {
@@ -210,199 +220,99 @@ size_t File::write(const String& str) {
 }
 
 int File::read() {
-    if (inFile.is_open()) {
-        return inFile.get();
-    }
-    return -1;
+    if (!inFile || !inFile->is_open()) return -1;
+    return inFile->get();
 }
 
 String File::readString() {
-    if (inFile.is_open()) {
-        std::string content((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
-        return String(content);
-    }
-    return String();
+    if (!inFile || !inFile->is_open()) return String("");
+    std::string result((std::istreambuf_iterator<char>(*inFile)), std::istreambuf_iterator<char>());
+    return String(result);
 }
 
 String File::readStringUntil(char terminator) {
+    if (!inFile || !inFile->is_open()) return String("");
     std::string result;
-    if (inFile.is_open()) {
-        std::getline(inFile, result, terminator);
-    }
+    std::getline(*inFile, result, terminator);
     return String(result);
 }
 
 bool File::available() {
-    return inFile.is_open() && inFile.good() && inFile.peek() != EOF;
+    if (!inFile || !inFile->is_open()) return false;
+    return inFile->peek() != EOF;
 }
 
 void File::seek(size_t pos) {
-    if (inFile.is_open()) inFile.seekg(pos);
-    if (outFile.is_open()) outFile.seekp(pos);
+    if (inFile && inFile->is_open()) inFile->seekg(pos);
+    if (outFile && outFile->is_open()) outFile->seekp(pos);
 }
 
 size_t File::size() {
-    if (!isOpen) return 0;
-    auto current = file.tellg();
-    file.seekg(0, std::ios::end);
-    auto size = file.tellg();
-    file.seekg(current);
-    return static_cast<size_t>(size);
+    if (!inFile || !inFile->is_open()) return 0;
+    auto current = inFile->tellg();
+    inFile->seekg(0, std::ios::end);
+    auto size = inFile->tellg();
+    inFile->seekg(current);
+    return size;
 }
 
-// MockSDCard implementation
-bool MockSDCard::begin(const char* mountpoint, bool mode1bit) {
-    rootPath = "./data";
-    std::filesystem::create_directories(rootPath);
-    std::cout << "[SD] Mounted at " << rootPath << std::endl;
-    return true;
+bool File::isDirectory() {
+    return isDir;
 }
 
-bool MockSDCard::exists(const char* path) {
-    std::string fullPath = rootPath + std::string(path);
-    return std::filesystem::exists(fullPath);
+File File::openNextFile() {
+    if (!isDir) return File();
+    if (dirIndex >= dirEntries.size()) return File();
+    std::string child = dirEntries[dirIndex++];
+    // Open child as a file (read mode)
+    // Convert full path back to relative path under ./data/
+    std::string rel = child;
+    const std::string prefix = "./data/";
+    if (rel.rfind(prefix, 0) == 0) rel = rel.substr(prefix.size());
+    // If the child is a directory, return a File representing that directory
+    try {
+        if (std::filesystem::is_directory(child)) {
+            return File(rel, "r");
+        }
+    } catch (...) {}
+    return File(rel, "r");
 }
 
-bool MockSDCard::mkdir(const char* path) {
-    std::string fullPath = rootPath + std::string(path);
-    return std::filesystem::create_directories(fullPath);
+String File::name() {
+    try {
+        std::filesystem::path p(filePath);
+        return String(p.filename().string());
+    } catch (...) {
+        return String("");
+    }
 }
 
-bool MockSDCard::remove(const char* path) {
-    std::string fullPath = rootPath + std::string(path);
-    return std::filesystem::remove(fullPath);
+bool File::print(const char* msg) {
+    if (!outFile || !outFile->is_open() || msg == nullptr) return false;
+    *outFile << msg;
+    return outFile->good();
 }
 
-File MockSDCard::open(const char* path, const char* mode) {
-    std::string fullPath = rootPath + std::string(path);
-    return File(fullPath, mode);
+bool File::print(const String& msg) {
+    return print(msg.c_str());
 }
 
-uint8_t MockSDCard::cardType() {
-    return 1; // Not CARD_NONE
+bool File::println(const char* msg) {
+    if (!outFile || !outFile->is_open()) return false;
+    if (msg) *outFile << msg;
+    *outFile << '\n';
+    return outFile->good();
 }
 
-// Mock display implementations
-void MockGxEPD2::init(unsigned long baud) {
-    std::cout << "[E-Ink] Initialized" << std::endl;
+bool File::println(const String& msg) {
+    return println(msg.c_str());
 }
 
-void MockGxEPD2::setRotation(uint8_t rotation) {}
-void MockGxEPD2::setTextColor(uint16_t color) {}
-void MockGxEPD2::setFullWindow() {}
+// SD_MMC implementation methods are in SD_MMC.h
 
-void MockGxEPD2::clearScreen() {
-    if (g_display) g_display->einkClear();
-}
+// Hardware implementations are now in their respective header files
 
-void MockGxEPD2::display() {
-    if (g_display) g_display->einkRefresh();
-}
-
-void MockGxEPD2::displayPartial() {
-    if (g_display) g_display->einkPartialRefresh();
-}
-
-void MockGxEPD2::setFont(const void* font) {}
-
-void MockGxEPD2::setCursor(int16_t x, int16_t y) {}
-
-void MockGxEPD2::print(const String& text) {
-    if (g_display) g_display->einkDrawText(text.c_str(), 0, 0);
-}
-
-void MockGxEPD2::println(const String& text) {
-    if (g_display) g_display->einkDrawText(text.c_str(), 0, 0);
-}
-
-void MockGxEPD2::drawPixel(int16_t x, int16_t y, uint16_t color) {
-    if (g_display) g_display->einkSetPixel(x, y, color == GxEPD_BLACK);
-}
-
-void MockGxEPD2::drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color) {
-    if (g_display) g_display->einkDrawLine(x0, y0, x1, y1, color == GxEPD_BLACK);
-}
-
-void MockGxEPD2::drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
-    if (g_display) g_display->einkDrawRect(x, y, w, h, false, color == GxEPD_BLACK);
-}
-
-void MockGxEPD2::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
-    if (g_display) g_display->einkDrawRect(x, y, w, h, true, color == GxEPD_BLACK);
-}
-
-// MockU8G2 implementation
-void MockU8G2::begin() {
-    std::cout << "[OLED] Initialized" << std::endl;
-}
-
-void MockU8G2::setBusClock(uint32_t clock) {}
-void MockU8G2::setPowerSave(uint8_t is_enable) {}
-
-void MockU8G2::clearBuffer() {
-    if (g_display) g_display->oledClear();
-}
-
-void MockU8G2::sendBuffer() {
-    if (g_display) g_display->oledUpdate();
-}
-
-void MockU8G2::setFont(const uint8_t* font) {}
-void MockU8G2::setCursor(int16_t x, int16_t y) {}
-
-void MockU8G2::print(const String& text) {
-    if (g_display) g_display->oledDrawText(text.c_str(), 0, 0);
-}
-
-void MockU8G2::drawStr(int16_t x, int16_t y, const char* str) {
-    if (g_display) g_display->oledDrawText(str, x, y);
-}
-
-void MockU8G2::drawPixel(int16_t x, int16_t y) {
-    if (g_display) g_display->oledSetPixel(x, y, true);
-}
-
-void MockU8G2::drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
-    if (g_display) g_display->oledDrawLine(x0, y0, x1, y1, true);
-}
-
-void MockU8G2::drawBox(int16_t x, int16_t y, int16_t w, int16_t h) {
-    if (g_display) g_display->oledDrawRect(x, y, w, h, true, true);
-}
-
-// Mock hardware implementations
-bool MockKeypad::begin(uint8_t addr, void* wire) { return true; }
-void MockKeypad::matrix(uint8_t rows, uint8_t cols) {}
-void MockKeypad::flush() {}
-void MockKeypad::enableInterrupts() {}
-bool MockKeypad::available() { return false; }
-uint8_t MockKeypad::getKey() { return 0; }
-
-void MockBuzzer::begin(uint8_t pin) {}
-void MockBuzzer::sound(int frequency, unsigned long duration) {
-    std::cout << "[Buzzer] " << frequency << "Hz for " << duration << "ms" << std::endl;
-}
-
-bool MockMPR121::begin(uint8_t addr) { return true; }
-uint16_t MockMPR121::touched() { return 0; }
-uint16_t MockMPR121::filteredData(uint8_t t) { return 0; }
-
-bool MockRTC::begin() { return true; }
-void MockRTC::adjust(uint32_t timestamp) {}
-void MockRTC::start() {}
-bool MockRTC::lostPower() { return false; }
-uint32_t MockRTC::now() { return millis() / 1000; }
-
-bool MockPreferences::begin(const char* name, bool readOnly) { return true; }
-void MockPreferences::end() {}
-void MockPreferences::clear() {}
-bool MockPreferences::remove(const char* key) { return true; }
-size_t MockPreferences::putInt(const char* key, int32_t value) { return 4; }
-size_t MockPreferences::putBool(const char* key, bool value) { return 1; }
-size_t MockPreferences::putString(const char* key, const String& value) { return value.length(); }
-int32_t MockPreferences::getInt(const char* key, int32_t defaultValue) { return defaultValue; }
-bool MockPreferences::getBool(const char* key, bool defaultValue) { return defaultValue; }
-String MockPreferences::getString(const char* key, const String& defaultValue) { return defaultValue; }
+// All mock implementations are now in their respective header files
 
 // Mock GPIO and system functions
 void pinMode(uint8_t pin, uint8_t mode) {}
@@ -412,11 +322,141 @@ int analogRead(uint8_t pin) { return 512; }
 void attachInterrupt(uint8_t pin, void (*callback)(), int mode) {}
 void xTaskCreatePinnedToCore(void (*task)(void*), const char* name, 
     uint32_t stackSize, void* params, uint8_t priority, 
-    TaskHandle_t* handle, uint8_t core) {}
+    void** handle, uint8_t core) {}
 void vTaskDelay(uint32_t ticks) { delay(ticks); }
 // yield() already defined in esp32_shims.h
 void esp_sleep_enable_ext0_wakeup(uint8_t pin, int level) {}
-void esp_deep_sleep_start() { exit(0); }
-void setCpuFrequencyMhz(uint32_t freq) {
-    std::cout << "[CPU] Set frequency to " << freq << "MHz" << std::endl;
+// esp_deep_sleep_start is already defined in pocketmage_compat.h
+// setCpuFrequencyMhz already defined earlier in the file
+
+// SD_MMCClass method implementations
+File SD_MMCClass::open(const String& path, const char* mode) {
+    return open(path.c_str(), mode);
+}
+
+File SD_MMCClass::open(const char* path, const char* mode) {
+    if (!path) return File();
+    return File(std::string(path), std::string(mode ? mode : "r"));
+}
+
+bool SD_MMCClass::exists(const String& path) { return exists(path.c_str()); }
+
+bool SD_MMCClass::exists(const char* path) {
+    if (!path) return false;
+    std::filesystem::path p(std::string("./data/") + path);
+    return std::filesystem::exists(p);
+}
+
+bool SD_MMCClass::mkdir(const String& path) { return mkdir(path.c_str()); }
+
+bool SD_MMCClass::mkdir(const char* path) {
+    if (!path) return false;
+    std::filesystem::path p(std::string("./data/") + path);
+    std::error_code ec;
+    return std::filesystem::create_directories(p, ec) || std::filesystem::exists(p);
+}
+
+bool SD_MMCClass::remove(const String& path) { return remove(path.c_str()); }
+
+bool SD_MMCClass::remove(const char* path) {
+    if (!path) return false;
+    std::filesystem::path p(std::string("./data/") + path);
+    std::error_code ec;
+    return std::filesystem::remove(p, ec);
+}
+
+bool SD_MMCClass::rmdir(const String& path) { return rmdir(path.c_str()); }
+
+bool SD_MMCClass::rmdir(const char* path) {
+    if (!path) return false;
+    std::filesystem::path p(std::string("./data/") + path);
+    std::error_code ec;
+    return std::filesystem::remove_all(p, ec) > 0;
+}
+
+bool SD_MMCClass::rename(const char* path1, const char* path2) {
+    if (!path1 || !path2) return false;
+    std::filesystem::path p1(std::string("./data/") + path1);
+    std::filesystem::path p2(std::string("./data/") + path2);
+    std::error_code ec;
+    std::filesystem::create_directories(p2.parent_path(), ec);
+    std::filesystem::rename(p1, p2, ec);
+    return !ec;
+}
+
+bool SD_MMCClass::rename(const String& path1, const String& path2) {
+    return rename(path1.c_str(), path2.c_str());
+}
+
+// Missing function stubs for linker
+int countLines(String content, unsigned long maxLines) {
+    int lines = 1;
+    for (size_t i = 0; i < content.length() && lines < maxLines; i++) {
+        if (content.charAt(i) == '\n') lines++;
+    }
+    return lines;
+}
+
+void oledScroll() {
+    // Mock OLED scroll function
+}
+
+void setTXTFont(const GFXfont* font) {
+    // Mock font setting function
+}
+
+void vTaskDelete(void* handle) {
+    // Mock FreeRTOS task deletion
+}
+
+void drawStatusBar(String status) {
+    std::cout << "[StatusBar] " << status.c_str() << std::endl;
+}
+
+void einkTextDynamic(bool refresh, bool clear) {
+    std::cout << "[EinkText] refresh=" << refresh << " clear=" << clear << std::endl;
+}
+
+void multiPassRefesh(int passes) {
+    std::cout << "[MultiPass] passes=" << passes << std::endl;
+}
+
+void listDir(SD_MMCClass& fs, const char* dirname) {
+    std::cout << "[ListDir] " << dirname << std::endl;
+}
+
+void oledLine(String text, bool center, String prefix) {
+    std::cout << "[OledLine] " << prefix.c_str() << ": " << text.c_str() << std::endl;
+}
+
+void oledWord(String text, bool center, bool newline) {
+    std::cout << "[OledWord] " << text.c_str() << (newline ? "\n" : "");
+}
+
+void statusBar(String text, bool refresh) {
+    std::cout << "[StatusBar] " << text.c_str() << " refresh=" << refresh << std::endl;
+}
+
+// Arduino-style setup and loop functions for emulator
+void setup() {
+    Serial.begin(115200);
+    Serial.println("PocketMage Desktop Emulator Starting...");
+    
+    // Initialize mock SD card
+    SD_MMC.begin();
+    
+    // Initialize PocketMage state variables that are expected by the real code
+    extern volatile bool newState;
+    extern AppState CurrentAppState;
+    
+    newState = true;
+    CurrentAppState = HOME;  // Start in HOME state
+    
+    Serial.println("Setup complete!");
+}
+
+void loop() {
+    // Simple main loop - just handle basic state
+    // The real app logic is handled by the desktop display callbacks
+    delay(10);
 }
