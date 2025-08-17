@@ -393,7 +393,7 @@ void processKB_TXT() {
 }
 
 void einkHandler_TXT() {
-  /*if ((prevAllText != allText) || newState) {
+  if ((prevAllText != allText) || newState) {
     newState = false;
     switch (CurrentTXTState) {
       case TXT_:
@@ -486,7 +486,7 @@ void einkHandler_TXT() {
         CurrentKBState = NORMAL;
         break;
     }
-  }*/
+  }
 }
 
 // NEW MAINS
@@ -968,7 +968,10 @@ void einkHandler_TXT_NEW() {
         if (newState && doFull) {
           std::cout << "[POCKETMAGE] Filling screen white and refreshing..." << std::endl;
           display.fillScreen(GxEPD_WHITE);
+          std::cout << "[POCKETMAGE] Drawing text editor content..." << std::endl;
+          einkTextDynamic(true, true);
           refresh();
+          newState = false;  // Reset state flag
         }
         if (newLineAdded && !newState) {
           einkTextDynamic(true);

@@ -185,6 +185,8 @@ void einkTextPartial(String text, bool noRefresh) {
 }
 
 void einkTextDynamic(bool doFull_, bool noRefresh) {
+  std::cout << "[POCKETMAGE] einkTextDynamic() called - doFull_=" << doFull_ << ", noRefresh=" << noRefresh << std::endl;
+  std::cout << "[POCKETMAGE] allLines.size()=" << allLines.size() << ", allText='" << allText.c_str() << "'" << std::endl;
   // SET FONT
   setTXTFont(currentFont);
 
@@ -201,14 +203,26 @@ void einkTextDynamic(bool doFull_, bool noRefresh) {
 
   // FULL REFRESH OPERATION
   if (doFull_) {
+    std::cout << "[POCKETMAGE] Full refresh - clearing screen and drawing " << displayLines << " lines" << std::endl;
     display.fillScreen(GxEPD_WHITE);
-    for (uint8_t i = size - displayLines - scrollOffset; i < size - scrollOffset; i++) {
-      if ((allLines[i]).length() > 0) {
-        display.setFullWindow();
-        //display.fillRect(0, (fontHeight + lineSpacing) * (i - (size - displayLines - scrollOffset)), display.width(), (fontHeight + lineSpacing), GxEPD_WHITE);
-        display.setCursor(0, fontHeight + ((fontHeight + lineSpacing) * (i - (size - displayLines - scrollOffset))));
-        display.print(allLines[i]);
-        Serial.println(allLines[i]);
+    
+    // If no content, show a cursor or placeholder
+    if (size == 0 || allText.length() == 0) {
+      std::cout << "[POCKETMAGE] No content - drawing cursor/placeholder" << std::endl;
+      display.setFullWindow();
+      display.setCursor(0, fontHeight);
+      display.print("_");  // Show cursor
+    } else {
+      std::cout << "[POCKETMAGE] Drawing " << size << " lines of text" << std::endl;
+      for (uint8_t i = size - displayLines - scrollOffset; i < size - scrollOffset; i++) {
+        if ((allLines[i]).length() > 0) {
+          display.setFullWindow();
+          //display.fillRect(0, (fontHeight + lineSpacing) * (i - (size - displayLines - scrollOffset)), display.width(), (fontHeight + lineSpacing), GxEPD_WHITE);
+          display.setCursor(0, fontHeight + ((fontHeight + lineSpacing) * (i - (size - displayLines - scrollOffset))));
+          display.print(allLines[i]);
+          std::cout << "[POCKETMAGE] Drew line " << i << ": '" << allLines[i].c_str() << "'" << std::endl;
+          Serial.println(allLines[i]);
+        }
       }
     }
   }

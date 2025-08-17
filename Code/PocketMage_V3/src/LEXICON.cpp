@@ -224,6 +224,7 @@ void einkHandler_LEXICON() {
       if (newState) {
         newState = false;
 
+        display.fillScreen(GxEPD_WHITE);
         display.drawBitmap(0, 0, _lex0, 320, 218, GxEPD_BLACK);
 
         drawStatusBar("Type a Word:");
@@ -235,6 +236,7 @@ void einkHandler_LEXICON() {
       if (newState) {
         newState = false;
 
+        display.fillScreen(GxEPD_WHITE);
         display.drawBitmap(0, 0, _lex1, 320, 218, GxEPD_BLACK);
 
         display.setTextColor(GxEPD_BLACK);

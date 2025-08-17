@@ -625,6 +625,39 @@ void einkTextDynamic(bool refresh, bool clear) {
     std::cout << "[EinkText] refresh=" << refresh << " clear=" << clear << std::endl;
 }
 
+void einkTextPartial(String text, bool clear) {
+    std::cout << "[EinkTextPartial] text='" << text.c_str() << "' clear=" << clear << std::endl;
+    
+    if (g_display) {
+        if (clear) {
+            g_display->einkClear();
+        }
+        
+        // Simple text rendering - split by lines and render each line
+        String currentText = text;
+        int y = 20; // Start position
+        int lineHeight = 16;
+        
+        while (currentText.length() > 0 && y < 128) {
+            int newlinePos = currentText.indexOf('\n');
+            String line;
+            
+            if (newlinePos != -1) {
+                line = currentText.substring(0, newlinePos);
+                currentText = currentText.substring(newlinePos + 1);
+            } else {
+                line = currentText;
+                currentText = "";
+            }
+            
+            if (line.length() > 0) {
+                g_display->einkDrawText(line.c_str(), 5, y, 12);
+            }
+            y += lineHeight;
+        }
+    }
+}
+
 void multiPassRefesh(int passes) {
     std::cout << "[MultiPass] passes=" << passes << std::endl;
 }

@@ -89,7 +89,8 @@ void commandSelect(String command) {
     TXT_INIT();
   }
   /////////////////////////////
-  else if (command == "file wizard" || command == "wiz" || command == "file wiz" || command == "file" || command == "2") {
+  else if (command == "file wizard" || command == "wiz" || command == "file wiz" || command == "file" || command == "filewiz" || command == "2") {
+    std::cout << "[POCKETMAGE] Matched filewiz command! Calling FILEWIZ_INIT()" << std::endl;
     FILEWIZ_INIT();
   }
   /////////////////////////////
@@ -98,6 +99,7 @@ void commandSelect(String command) {
   }
   /////////////////////////////
   else if (command == "tasks" || command == "task" || command == "6") {
+    std::cout << "[POCKETMAGE] Matched tasks command! Calling TASKS_INIT()" << std::endl;
     TASKS_INIT();
   }
   /////////////////////////////
@@ -106,6 +108,7 @@ void commandSelect(String command) {
   }
   /////////////////////////////
   else if (command == "preferences" || command == "setting" || command == "settings" || command == "5") {
+    std::cout << "[POCKETMAGE] Matched settings command! Calling SETTINGS_INIT()" << std::endl;
     SETTINGS_INIT();
   }
   else if (command == "cal" || command == "calendar" || command == "7") {

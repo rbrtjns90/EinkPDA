@@ -504,6 +504,10 @@ bool DesktopDisplay::handleEvents() {
                     lastKey = 'R';
                     std::cout << "[KEYBOARD] Mapped to RIGHT arrow" << std::endl;
                     break;
+                case SDLK_ESCAPE:
+                    lastKey = 12;  // ASCII 12 - ESC key mapped to Home for PocketMage
+                    std::cout << "[KEYBOARD] Mapped to ESC (Home function)" << std::endl;
+                    break;
                 default:
                     lastKey = 0;
                     std::cout << "[KEYBOARD] Key not mapped" << std::endl;

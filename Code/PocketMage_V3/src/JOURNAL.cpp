@@ -444,15 +444,18 @@ void einkHandler_JOURNAL() {
       if (newState) {
         newState = false;
 
+        display.fillScreen(GxEPD_WHITE);
         drawJMENU();
 
         multiPassRefesh(2);
       }
       break;
     case J_TXT:
-      if (newState && doFull) {
+      if (newState) {
         display.fillScreen(GxEPD_WHITE);
-        refresh();
+        if (doFull) {
+          refresh();
+        }
       }
       if (newLineAdded && !newState) {
         einkTextDynamic(true);
