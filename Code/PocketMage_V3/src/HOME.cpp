@@ -8,7 +8,9 @@
 #include "globals.h"
 
 void commandSelect(String command) {
+  std::cout << "[POCKETMAGE] commandSelect() called with: '" << command.c_str() << "'" << std::endl;
   command.toLowerCase();
+  std::cout << "[POCKETMAGE] After toLowerCase(): '" << command.c_str() << "'" << std::endl;
 
   // OPEN IN FILE WIZARD
   if (command.startsWith("-")) {
@@ -83,6 +85,7 @@ void commandSelect(String command) {
   } 
   /////////////////////////////
   else if (command == "note" || command == "text" || command == "write" || command == "notebook" || command == "notepad" || command == "txt" || command == "1") {
+    std::cout << "[POCKETMAGE] Matched txt command! Calling TXT_INIT()" << std::endl;
     TXT_INIT();
   }
   /////////////////////////////
@@ -155,11 +158,15 @@ void processKB_HOME() {
     case HOME_HOME:
       if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
         char inchar = updateKeypress();
+        if (inchar != 0) {
+          std::cout << "[POCKETMAGE] processKB_HOME received: '" << inchar << "' (ASCII " << (int)inchar << ")" << std::endl;
+        }
         // HANDLE INPUTS
         //No char recieved
         if (inchar == 0);   
         //CR Recieved
         else if (inchar == 13) {                          
+          std::cout << "[POCKETMAGE] Enter pressed! Executing command: '" << currentLine.c_str() << "'" << std::endl;
           commandSelect(currentLine);
           currentLine = "";
         }                                      
@@ -196,6 +203,7 @@ void processKB_HOME() {
         }
         else {
           currentLine += inchar;
+          std::cout << "[POCKETMAGE] Added char to command: '" << inchar << "', currentLine now: '" << currentLine.c_str() << "'" << std::endl;
           if (inchar >= 48 && inchar <= 57) {}  //Only leave FN on if typing numbers
           else if (CurrentKBState != NORMAL) {
             CurrentKBState = NORMAL;
@@ -297,7 +305,7 @@ void drawHome() {
   uint16_t charWidth, charHeight;
   uint8_t appsPerRow = 5; // Number of apps per row
   uint8_t spacingX = 60;  // Horizontal spacing
-  uint8_t spacingY = 60;  // Vertical spacing
+  uint8_t spacingY = 75;  // Vertical spacing (increased for better layout)
   uint8_t iconSize = 40;  // Icon width and height
   uint8_t startX = 20;    // Initial X position
   uint8_t startY = 20;    // Initial Y position

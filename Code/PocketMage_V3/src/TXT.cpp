@@ -8,11 +8,16 @@
 #include "globals.h"
 
 void TXT_INIT() {
+  std::cout << "[POCKETMAGE] TXT_INIT() starting..." << std::endl;
   if (editingFile != "") loadFile();
   CurrentAppState = TXT;
+  CurrentTXTState = TXT_;
   CurrentKBState  = NORMAL;
   dynamicScroll = 0;
   newLineAdded = true;
+  newState = true;  // Force display refresh
+  doFull = true;    // Force full screen refresh
+  std::cout << "[POCKETMAGE] TXT_INIT() complete - CurrentAppState=TXT, CurrentTXTState=TXT_, newState=true, doFull=true" << std::endl;
 }
 
 // OLD MAINS
@@ -956,9 +961,12 @@ void processKB_TXT_NEW() {
 
 void einkHandler_TXT_NEW() {
   if (newLineAdded || newState) {
+    std::cout << "[POCKETMAGE] einkHandler_TXT_NEW() called - newLineAdded=" << newLineAdded << ", newState=" << newState << ", CurrentTXTState=" << CurrentTXTState << std::endl;
     switch (CurrentTXTState) {
       case TXT_:
+        std::cout << "[POCKETMAGE] TXT_ state - doFull=" << doFull << std::endl;
         if (newState && doFull) {
+          std::cout << "[POCKETMAGE] Filling screen white and refreshing..." << std::endl;
           display.fillScreen(GxEPD_WHITE);
           refresh();
         }

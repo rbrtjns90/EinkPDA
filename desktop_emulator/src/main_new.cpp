@@ -1,7 +1,8 @@
 #include "pocketmage_compat.h"
 #include "desktop_display.h"
-#include "SD_MMC.h"
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 // Include globals to access AppState enum
 enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
@@ -35,7 +36,9 @@ extern void LEXICON_INIT();
 
 // Emulator-specific setup
 void emulatorSetup() {
-    std::cout << "=== PocketMage Desktop Emulator ===" << std::endl;
+    std::cout << "===================================" << std::endl;
+    std::cout << "PocketMage Desktop Emulator v1.0" << std::endl;
+    std::cout << "===================================" << std::endl;
     std::cout << "Controls:" << std::endl;
     std::cout << "  Arrow keys - Navigation" << std::endl;
     std::cout << "  Enter - Select/Confirm" << std::endl;
@@ -57,8 +60,16 @@ void emulatorSetup() {
     newState = true;
     CurrentAppState = HOME;
     
-    // Call real PocketMage setup
-    setup();
+    std::cout << "Calling PocketMage setup()..." << std::endl;
+    // Call real PocketMage setup in a separate thread to avoid blocking
+    std::thread setupThread([]() {
+        setup();
+    });
+    setupThread.detach(); // Let it run independently
+    
+    // Give setup time to initialize
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    std::cout << "PocketMage setup() started" << std::endl;
 }
 
 // Forward declare the application handler
@@ -93,14 +104,28 @@ int main() {
     bool running = true;
     int frameCount = 0;
     while (running) {
-        emulatorLoop();
+        // Handle SDL events first
+        if (!g_display->handleEvents()) {
+            running = false;
+            break;
+        }
+        
+        // Call real PocketMage loop to process input
+        loop();
+        
+        // Call the E-Ink handler to render UI
+        applicationEinkHandler();
+        
+        // Present only after all rendering is complete
+        g_display->present();
+        
         frameCount++;
         if (frameCount % 100 == 0) {
-            std::cout << "Frame " << frameCount << std::endl;
+            std::cout << "[MAIN] Frame " << frameCount << std::endl;
         }
-        if (!g_display || !g_display->handleEvents()) {
-            running = false;
-        }
+        
+        // Limit frame rate
+        delay(33); // ~30 FPS
     }
     
     // Cleanup

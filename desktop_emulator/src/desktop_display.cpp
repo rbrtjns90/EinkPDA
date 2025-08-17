@@ -30,11 +30,11 @@ bool DesktopDisplay::init() {
         return false;
     }
     
-    // Create E-Ink window with explicit positioning
+    // Create E-Ink window with explicit positioning and input focus
     einkWindow = SDL_CreateWindow("PocketMage E-Ink Display (310x128)",
         100, 100,  // Explicit position instead of SDL_WINDOWPOS_UNDEFINED
         EINK_WIDTH * SCALE_FACTOR, EINK_HEIGHT * SCALE_FACTOR,
-        SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
+        SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_INPUT_FOCUS);
     
     if (!einkWindow) {
         std::cerr << "E-Ink window could not be created! SDL_Error: " << SDL_GetError() << std::endl;
@@ -61,7 +61,7 @@ bool DesktopDisplay::init() {
         return false;
     }
     
-    // Create textures
+    // Create textures with RGB24 format as originally working
     einkTexture = SDL_CreateTexture(einkRenderer, SDL_PIXELFORMAT_RGB24, 
         SDL_TEXTUREACCESS_STREAMING, EINK_WIDTH, EINK_HEIGHT);
     oledTexture = SDL_CreateTexture(oledRenderer, SDL_PIXELFORMAT_RGB24,
@@ -121,7 +121,15 @@ bool DesktopDisplay::init() {
     // Give SDL time to process window events
     SDL_PumpEvents();
     
+    // Force focus on the E-Ink window for keyboard input
+    SDL_RaiseWindow(einkWindow);
+    SDL_SetWindowInputFocus(einkWindow);
+    
+    // Don't grab the mouse - just focus for keyboard input
+    
     std::cout << "[Display] SDL2 windows initialized and visible" << std::endl;
+    std::cout << "[Display] E-Ink window focused for keyboard input" << std::endl;
+    std::cout << "[Display] Click on the E-Ink window and try typing!" << std::endl;
     
     return true;
 }
@@ -435,14 +443,24 @@ void DesktopDisplay::oledUpdate() {
 }
 
 bool DesktopDisplay::handleEvents() {
+    // Force SDL to process any pending events
+    SDL_PumpEvents();
+    
     SDL_Event e;
+    bool hasEvents = false;
     while (SDL_PollEvent(&e)) {
+        hasEvents = true;
+        std::cout << "[SDL2] Processing event type: " << e.type << std::endl;
+        
         if (e.type == SDL_QUIT) {
             return false;
         } else if (e.type == SDL_KEYDOWN) {
+            std::cout << "[KEYBOARD] Key pressed: " << SDL_GetKeyName(e.key.keysym.sym) 
+                      << " (scancode: " << e.key.keysym.scancode << ")" << std::endl;
+            
             keyPressed[e.key.keysym.scancode] = true;
             
-            // Map common keys to characters
+            // Map common keys to ASCII
             switch (e.key.keysym.sym) {
                 case SDLK_a: case SDLK_b: case SDLK_c: case SDLK_d: case SDLK_e:
                 case SDLK_f: case SDLK_g: case SDLK_h: case SDLK_i: case SDLK_j:
@@ -451,40 +469,58 @@ bool DesktopDisplay::handleEvents() {
                 case SDLK_u: case SDLK_v: case SDLK_w: case SDLK_x: case SDLK_y:
                 case SDLK_z:
                     lastKey = e.key.keysym.sym;
+                    std::cout << "[KEYBOARD] Mapped to ASCII: '" << (char)lastKey << "'" << std::endl;
                     break;
                 case SDLK_0: case SDLK_1: case SDLK_2: case SDLK_3: case SDLK_4:
                 case SDLK_5: case SDLK_6: case SDLK_7: case SDLK_8: case SDLK_9:
                     lastKey = e.key.keysym.sym;
+                    std::cout << "[KEYBOARD] Mapped to ASCII: '" << (char)lastKey << "'" << std::endl;
                     break;
                 case SDLK_SPACE:
                     lastKey = ' ';
+                    std::cout << "[KEYBOARD] Mapped to SPACE" << std::endl;
                     break;
                 case SDLK_RETURN:
-                    lastKey = '\n';
+                    lastKey = 13;  // ASCII 13 (CR) - what PocketMage expects
+                    std::cout << "[KEYBOARD] Mapped to ENTER (CR)" << std::endl;
                     break;
                 case SDLK_BACKSPACE:
                     lastKey = '\b';
+                    std::cout << "[KEYBOARD] Mapped to BACKSPACE" << std::endl;
                     break;
                 case SDLK_UP:
                     lastKey = 'U';
+                    std::cout << "[KEYBOARD] Mapped to UP arrow" << std::endl;
                     break;
                 case SDLK_DOWN:
                     lastKey = 'D';
+                    std::cout << "[KEYBOARD] Mapped to DOWN arrow" << std::endl;
                     break;
                 case SDLK_LEFT:
                     lastKey = 'L';
+                    std::cout << "[KEYBOARD] Mapped to LEFT arrow" << std::endl;
                     break;
                 case SDLK_RIGHT:
                     lastKey = 'R';
+                    std::cout << "[KEYBOARD] Mapped to RIGHT arrow" << std::endl;
                     break;
                 default:
                     lastKey = 0;
+                    std::cout << "[KEYBOARD] Key not mapped" << std::endl;
                     break;
             }
         } else if (e.type == SDL_KEYUP) {
             keyPressed[e.key.keysym.scancode] = false;
         }
     }
+    
+    // Debug: Show if we processed any events
+    static int callCount = 0;
+    callCount++;
+    if (callCount % 100 == 1) {
+        std::cout << "[DEBUG] handleEvents() call #" << callCount << ", hasEvents: " << (hasEvents ? "YES" : "NO") << std::endl;
+    }
+    
     return true;
 }
 
@@ -516,8 +552,6 @@ void DesktopDisplay::present() {
     SDL_RenderClear(oledRenderer);
     SDL_RenderCopy(oledRenderer, oledTexture, nullptr, nullptr);
     SDL_RenderPresent(oledRenderer);
-    
-    std::cout << "[DISPLAY] Frame presented" << std::endl;
 }
 
 void DesktopDisplay::updateEinkTexture() {
@@ -529,12 +563,16 @@ void DesktopDisplay::updateEinkTexture() {
         
         for (int y = 0; y < EINK_HEIGHT; y++) {
             for (int x = 0; x < EINK_WIDTH; x++) {
-                Uint8 value = einkBuffer[y * EINK_WIDTH + x];
-                int index = y * pitch + x * 3;
-                // Write RGB values directly - texture is properly sized
-                pixelBytes[index] = value;     // R
-                pixelBytes[index + 1] = value; // G
-                pixelBytes[index + 2] = value; // B
+                int bufferIndex = y * EINK_WIDTH + x;
+                if (bufferIndex < einkBuffer.size()) {
+                    Uint8 value = einkBuffer[bufferIndex];
+                    int pixelIndex = y * pitch + x * 3; // RGB24 format
+                    if (pixelIndex + 2 < pitch * EINK_HEIGHT) {
+                        pixelBytes[pixelIndex] = value;     // R
+                        pixelBytes[pixelIndex + 1] = value; // G
+                        pixelBytes[pixelIndex + 2] = value; // B
+                    }
+                }
             }
         }
         
@@ -551,12 +589,15 @@ void DesktopDisplay::updateOledTexture() {
         
         for (int y = 0; y < OLED_HEIGHT; y++) {
             for (int x = 0; x < OLED_WIDTH; x++) {
-                Uint8 value = oledBuffer[y * OLED_WIDTH + x];
-                int index = y * pitch + x * 3;
-                if (index + 2 < pitch * OLED_HEIGHT) {
-                    pixelBytes[index] = value;     // R
-                    pixelBytes[index + 1] = value; // G
-                    pixelBytes[index + 2] = value; // B
+                int bufferIndex = y * OLED_WIDTH + x;
+                if (bufferIndex < oledBuffer.size()) {
+                    Uint8 value = oledBuffer[bufferIndex] ? 255 : 0;
+                    int pixelIndex = y * pitch + x * 3; // RGB24 format
+                    if (pixelIndex + 2 < pitch * OLED_HEIGHT) {
+                        pixelBytes[pixelIndex] = value;     // R
+                        pixelBytes[pixelIndex + 1] = value; // G
+                        pixelBytes[pixelIndex + 2] = value; // B
+                    }
                 }
             }
         }
