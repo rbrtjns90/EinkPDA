@@ -375,6 +375,14 @@ void pinMode(uint8_t pin, uint8_t mode) {}
 int digitalRead(uint8_t pin) { return 0; }
 void digitalWrite(uint8_t pin, uint8_t value) {}
 int analogRead(uint8_t pin) { return 512; }
+
+// Implement updateKeypress for PocketMage keyboard input
+char updateKeypress() {
+    if (g_display) {
+        return g_display->getLastKey();
+    }
+    return 0;
+}
 BaseType_t xTaskCreatePinnedToCore(void (*pvTaskCode)(void*), const char* const pcName,
                                   const uint32_t ulStackDepth, void* const pvParameters,
                                   UBaseType_t uxPriority, TaskHandle_t* const pvCreatedTask,
