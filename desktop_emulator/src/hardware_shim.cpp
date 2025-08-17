@@ -6,6 +6,9 @@
 #include "Adafruit_TCA8418.h"
 #include "Adafruit_GFX.h"
 
+// Access to global display instance
+extern DesktopDisplay* g_display;
+
 // Include AppState enum definition
 enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
 #include "GxEPD2_BW.h"
@@ -511,13 +514,27 @@ void listDir(SD_MMCClass& fs, const char* dirname) {
 }
 
 void oledLine(String text, bool center, String prefix) {
-    std::cout << "[OledLine] " << prefix.c_str() << ": " << text.c_str() << std::endl;
+    if (g_display) {
+        String fullText = prefix + ": " + text;
+        g_display->oledDrawText(fullText.c_str(), center ? 64 : 0, 16, 8);
+        g_display->oledUpdate();
+    }
 }
 
 void oledWord(String text, bool center, bool newline) {
-    std::cout << "[OledWord] " << text.c_str() << (newline ? "\n" : "");
+    if (g_display) {
+        static int oled_y = 0;
+        g_display->oledDrawText(text.c_str(), center ? 64 : 0, oled_y, 8);
+        if (newline) oled_y += 8;
+        if (oled_y >= 32) oled_y = 0;
+        g_display->oledUpdate();
+    }
 }
 
 void statusBar(String text, bool refresh) {
-    std::cout << "[StatusBar] " << text.c_str() << " refresh=" << refresh << std::endl;
+    if (g_display) {
+        // Draw status bar at bottom of OLED display
+        g_display->oledDrawText(text.c_str(), 0, 24, 8);
+        if (refresh) g_display->oledUpdate();
+    }
 }
