@@ -1,0 +1,19 @@
+# Build directories
+build/
+*.o
+*.a
+*.so
+*.dylib
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Executable
+PocketMage_Desktop_Emulator

@@ -1,0 +1,79 @@
+#ifndef DESKTOP_DISPLAY_H
+#define DESKTOP_DISPLAY_H
+
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
+#include <string>
+#include <vector>
+#include <cstdint>
+
+// Display dimensions matching the hardware
+#define EINK_WIDTH 310
+#define EINK_HEIGHT 128
+#define OLED_WIDTH 256
+#define OLED_HEIGHT 32
+
+// Window scaling for better visibility
+#define SCALE_FACTOR 3
+
+class DesktopDisplay {
+public:
+    DesktopDisplay();
+    ~DesktopDisplay();
+    
+    bool init();
+    void cleanup();
+    
+    // E-Ink display methods
+    void einkClear();
+    void einkSetPixel(int x, int y, bool black = true);
+    void einkDrawText(const std::string& text, int x, int y, int size = 12);
+    void einkDrawLine(int x0, int y0, int x1, int y1, bool black = true);
+    void einkDrawRect(int x, int y, int w, int h, bool filled = false, bool black = true);
+    void einkRefresh();
+    void einkPartialRefresh();
+    
+    // OLED display methods
+    void oledClear();
+    void oledSetPixel(int x, int y, bool on = true);
+    void oledDrawText(const std::string& text, int x, int y, int size = 8);
+    void oledDrawLine(int x0, int y0, int x1, int y1, bool on = true);
+    void oledDrawRect(int x, int y, int w, int h, bool filled = false, bool on = true);
+    void oledUpdate();
+    
+    // Input handling
+    bool handleEvents();
+    char getLastKey();
+    bool isKeyPressed(SDL_Scancode key);
+    
+    // Utility
+    void present();
+    
+private:
+    SDL_Window* einkWindow;
+    SDL_Window* oledWindow;
+    SDL_Renderer* einkRenderer;
+    SDL_Renderer* oledRenderer;
+    SDL_Texture* einkTexture;
+    SDL_Texture* oledTexture;
+    TTF_Font* font;
+    TTF_Font* smallFont;
+    
+    // Display buffers
+    std::vector<uint8_t> einkBuffer;
+    std::vector<uint8_t> oledBuffer;
+    
+    // Input state
+    char lastKey;
+    bool keyPressed[SDL_NUM_SCANCODES];
+    
+    void updateEinkTexture();
+    void updateOledTexture();
+    SDL_Color getEinkColor(bool black);
+    SDL_Color getOledColor(bool on);
+};
+
+// Global display instance
+extern DesktopDisplay* g_display;
+
+#endif // DESKTOP_DISPLAY_H

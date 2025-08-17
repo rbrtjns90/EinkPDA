@@ -1,0 +1,366 @@
+#include "hardware_shim.h"
+#include "desktop_display.h"
+#include <iostream>
+#include <chrono>
+#include <thread>
+#include <random>
+#include <algorithm>
+#include <cctype>
+
+// Global instances
+MockSerial Serial;
+MockSDCard SD_MMC;
+
+// Timing
+static auto startTime = std::chrono::steady_clock::now();
+
+void delay(unsigned long ms) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+}
+
+unsigned long millis() {
+    auto now = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime);
+    return duration.count();
+}
+
+void randomSeed(unsigned long seed) {
+    srand(seed);
+}
+
+long random(long max) {
+    return rand() % max;
+}
+
+long random(long min, long max) {
+    return min + (rand() % (max - min));
+}
+
+// MockSerial implementation
+void MockSerial::begin(unsigned long baud) {
+    std::cout << "[Serial] Begin at " << baud << " baud" << std::endl;
+}
+
+void MockSerial::print(const std::string& str) {
+    std::cout << str;
+}
+
+void MockSerial::println(const std::string& str) {
+    std::cout << str << std::endl;
+}
+
+void MockSerial::flush() {
+    std::cout.flush();
+}
+
+// String implementation
+String String::substring(size_t start, size_t end) const {
+    if (end == std::string::npos) {
+        return String(data.substr(start));
+    }
+    return String(data.substr(start, end - start));
+}
+
+int String::indexOf(const String& str, int start) const {
+    size_t pos = data.find(str.data, start);
+    return pos == std::string::npos ? -1 : static_cast<int>(pos);
+}
+
+String String::replace(const String& from, const String& to) const {
+    std::string result = data;
+    size_t pos = 0;
+    while ((pos = result.find(from.data, pos)) != std::string::npos) {
+        result.replace(pos, from.data.length(), to.data);
+        pos += to.data.length();
+    }
+    return String(result);
+}
+
+String String::toLowerCase() const {
+    std::string result = data;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return String(result);
+}
+
+String String::toUpperCase() const {
+    std::string result = data;
+    std::transform(result.begin(), result.end(), result.begin(), ::toupper);
+    return String(result);
+}
+
+String String::operator+(const String& other) const {
+    return String(data + other.data);
+}
+
+String& String::operator+=(const String& other) {
+    data += other.data;
+    return *this;
+}
+
+bool String::operator==(const String& other) const {
+    return data == other.data;
+}
+
+bool String::operator!=(const String& other) const {
+    return data != other.data;
+}
+
+char String::operator[](size_t index) const {
+    return index < data.size() ? data[index] : '\0';
+}
+
+// File implementation
+File::File() : isOpen(false) {}
+
+File::File(const std::string& path, const std::string& mode) : isOpen(false) {
+    std::ios::openmode openMode = std::ios::in;
+    if (mode == "w" || mode == FILE_WRITE) {
+        openMode = std::ios::out | std::ios::trunc;
+    } else if (mode == "a" || mode == FILE_APPEND) {
+        openMode = std::ios::out | std::ios::app;
+    } else if (mode == "r+" || mode == "w+") {
+        openMode = std::ios::in | std::ios::out;
+    }
+    
+    file.open(path, openMode);
+    isOpen = file.is_open();
+}
+
+File::~File() {
+    if (isOpen) {
+        file.close();
+    }
+}
+
+void File::close() {
+    if (isOpen) {
+        file.close();
+        isOpen = false;
+    }
+}
+
+size_t File::write(const uint8_t* data, size_t len) {
+    if (!isOpen) return 0;
+    file.write(reinterpret_cast<const char*>(data), len);
+    return len;
+}
+
+size_t File::write(const std::string& str) {
+    if (!isOpen) return 0;
+    file << str;
+    return str.length();
+}
+
+int File::read() {
+    if (!isOpen) return -1;
+    return file.get();
+}
+
+String File::readString() {
+    if (!isOpen) return String();
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+    return String(content);
+}
+
+String File::readStringUntil(char terminator) {
+    if (!isOpen) return String();
+    std::string line;
+    std::getline(file, line, terminator);
+    return String(line);
+}
+
+bool File::available() {
+    return isOpen && !file.eof();
+}
+
+void File::seek(size_t pos) {
+    if (isOpen) {
+        file.seekg(pos);
+        file.seekp(pos);
+    }
+}
+
+size_t File::position() {
+    return isOpen ? static_cast<size_t>(file.tellg()) : 0;
+}
+
+size_t File::size() {
+    if (!isOpen) return 0;
+    auto current = file.tellg();
+    file.seekg(0, std::ios::end);
+    auto size = file.tellg();
+    file.seekg(current);
+    return static_cast<size_t>(size);
+}
+
+// MockSDCard implementation
+bool MockSDCard::begin(const char* mountpoint, bool mode1bit) {
+    rootPath = "./data";
+    std::filesystem::create_directories(rootPath);
+    std::cout << "[SD] Mounted at " << rootPath << std::endl;
+    return true;
+}
+
+bool MockSDCard::exists(const char* path) {
+    std::string fullPath = rootPath + std::string(path);
+    return std::filesystem::exists(fullPath);
+}
+
+bool MockSDCard::mkdir(const char* path) {
+    std::string fullPath = rootPath + std::string(path);
+    return std::filesystem::create_directories(fullPath);
+}
+
+bool MockSDCard::remove(const char* path) {
+    std::string fullPath = rootPath + std::string(path);
+    return std::filesystem::remove(fullPath);
+}
+
+File MockSDCard::open(const char* path, const char* mode) {
+    std::string fullPath = rootPath + std::string(path);
+    return File(fullPath, mode);
+}
+
+uint8_t MockSDCard::cardType() {
+    return 1; // Not CARD_NONE
+}
+
+// Mock display implementations
+void MockGxEPD2::init(unsigned long baud) {
+    std::cout << "[E-Ink] Initialized" << std::endl;
+}
+
+void MockGxEPD2::setRotation(uint8_t rotation) {}
+void MockGxEPD2::setTextColor(uint16_t color) {}
+void MockGxEPD2::setFullWindow() {}
+
+void MockGxEPD2::clearScreen() {
+    if (g_display) g_display->einkClear();
+}
+
+void MockGxEPD2::display() {
+    if (g_display) g_display->einkRefresh();
+}
+
+void MockGxEPD2::displayPartial() {
+    if (g_display) g_display->einkPartialRefresh();
+}
+
+void MockGxEPD2::setFont(const void* font) {}
+
+void MockGxEPD2::setCursor(int16_t x, int16_t y) {}
+
+void MockGxEPD2::print(const String& text) {
+    if (g_display) g_display->einkDrawText(text.data, 0, 0);
+}
+
+void MockGxEPD2::println(const String& text) {
+    if (g_display) g_display->einkDrawText(text.data, 0, 0);
+}
+
+void MockGxEPD2::drawPixel(int16_t x, int16_t y, uint16_t color) {
+    if (g_display) g_display->einkSetPixel(x, y, color == GxEPD_BLACK);
+}
+
+void MockGxEPD2::drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color) {
+    if (g_display) g_display->einkDrawLine(x0, y0, x1, y1, color == GxEPD_BLACK);
+}
+
+void MockGxEPD2::drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
+    if (g_display) g_display->einkDrawRect(x, y, w, h, false, color == GxEPD_BLACK);
+}
+
+void MockGxEPD2::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
+    if (g_display) g_display->einkDrawRect(x, y, w, h, true, color == GxEPD_BLACK);
+}
+
+// MockU8G2 implementation
+void MockU8G2::begin() {
+    std::cout << "[OLED] Initialized" << std::endl;
+}
+
+void MockU8G2::setBusClock(uint32_t clock) {}
+void MockU8G2::setPowerSave(uint8_t is_enable) {}
+
+void MockU8G2::clearBuffer() {
+    if (g_display) g_display->oledClear();
+}
+
+void MockU8G2::sendBuffer() {
+    if (g_display) g_display->oledUpdate();
+}
+
+void MockU8G2::setFont(const uint8_t* font) {}
+void MockU8G2::setCursor(int16_t x, int16_t y) {}
+
+void MockU8G2::print(const String& text) {
+    if (g_display) g_display->oledDrawText(text.data, 0, 0);
+}
+
+void MockU8G2::drawStr(int16_t x, int16_t y, const char* str) {
+    if (g_display) g_display->oledDrawText(str, x, y);
+}
+
+void MockU8G2::drawPixel(int16_t x, int16_t y) {
+    if (g_display) g_display->oledSetPixel(x, y, true);
+}
+
+void MockU8G2::drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
+    if (g_display) g_display->oledDrawLine(x0, y0, x1, y1, true);
+}
+
+void MockU8G2::drawBox(int16_t x, int16_t y, int16_t w, int16_t h) {
+    if (g_display) g_display->oledDrawRect(x, y, w, h, true, true);
+}
+
+// Mock hardware implementations
+bool MockKeypad::begin(uint8_t addr, void* wire) { return true; }
+void MockKeypad::matrix(uint8_t rows, uint8_t cols) {}
+void MockKeypad::flush() {}
+void MockKeypad::enableInterrupts() {}
+bool MockKeypad::available() { return false; }
+uint8_t MockKeypad::getKey() { return 0; }
+
+void MockBuzzer::begin(uint8_t pin) {}
+void MockBuzzer::sound(int frequency, unsigned long duration) {
+    std::cout << "[Buzzer] " << frequency << "Hz for " << duration << "ms" << std::endl;
+}
+
+bool MockMPR121::begin(uint8_t addr) { return true; }
+uint16_t MockMPR121::touched() { return 0; }
+uint16_t MockMPR121::filteredData(uint8_t t) { return 0; }
+
+bool MockRTC::begin() { return true; }
+void MockRTC::adjust(uint32_t timestamp) {}
+void MockRTC::start() {}
+bool MockRTC::lostPower() { return false; }
+uint32_t MockRTC::now() { return millis() / 1000; }
+
+bool MockPreferences::begin(const char* name, bool readOnly) { return true; }
+void MockPreferences::end() {}
+void MockPreferences::clear() {}
+bool MockPreferences::remove(const char* key) { return true; }
+size_t MockPreferences::putInt(const char* key, int32_t value) { return 4; }
+size_t MockPreferences::putBool(const char* key, bool value) { return 1; }
+size_t MockPreferences::putString(const char* key, const String& value) { return value.length(); }
+int32_t MockPreferences::getInt(const char* key, int32_t defaultValue) { return defaultValue; }
+bool MockPreferences::getBool(const char* key, bool defaultValue) { return defaultValue; }
+String MockPreferences::getString(const char* key, const String& defaultValue) { return defaultValue; }
+
+// Mock GPIO and system functions
+void pinMode(uint8_t pin, uint8_t mode) {}
+int digitalRead(uint8_t pin) { return 0; }
+void digitalWrite(uint8_t pin, uint8_t value) {}
+int analogRead(uint8_t pin) { return 512; }
+void attachInterrupt(uint8_t pin, void (*callback)(), int mode) {}
+void xTaskCreatePinnedToCore(void (*task)(void*), const char* name, 
+    uint32_t stackSize, void* params, uint8_t priority, 
+    TaskHandle_t* handle, uint8_t core) {}
+void vTaskDelay(uint32_t ticks) { delay(ticks); }
+void yield() { std::this_thread::yield(); }
+void esp_sleep_enable_ext0_wakeup(uint8_t pin, int level) {}
+void esp_deep_sleep_start() { exit(0); }
+void setCpuFrequencyMhz(uint32_t freq) {
+    std::cout << "[CPU] Set frequency to " << freq << "MHz" << std::endl;
+}
