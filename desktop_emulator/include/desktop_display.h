@@ -9,7 +9,7 @@
 
 // Display dimensions matching the hardware
 #define EINK_WIDTH 310
-#define EINK_HEIGHT 128
+#define EINK_HEIGHT 240  // Further increased to accommodate 3 rows of icons with text
 #define OLED_WIDTH 256
 #define OLED_HEIGHT 32
 

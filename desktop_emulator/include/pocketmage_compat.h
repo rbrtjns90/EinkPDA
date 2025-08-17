@@ -482,7 +482,7 @@ public:
     void nextPage() {}
     
     int width() const { return 310; }
-    int height() const { return 128; }
+    int height() const { return 240; }
     
     void setCursor(int x, int y) { cursor_x = x; cursor_y = y; }
     void setFont(const void* font) {}

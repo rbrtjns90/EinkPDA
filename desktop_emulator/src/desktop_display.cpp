@@ -531,12 +531,10 @@ void DesktopDisplay::updateEinkTexture() {
             for (int x = 0; x < EINK_WIDTH; x++) {
                 Uint8 value = einkBuffer[y * EINK_WIDTH + x];
                 int index = y * pitch + x * 3;
-                // Ensure we don't write beyond the texture bounds
-                if (x < EINK_WIDTH && y < EINK_HEIGHT && index + 2 < pitch * EINK_HEIGHT) {
-                    pixelBytes[index] = value;     // R
-                    pixelBytes[index + 1] = value; // G
-                    pixelBytes[index + 2] = value; // B
-                }
+                // Write RGB values directly - texture is properly sized
+                pixelBytes[index] = value;     // R
+                pixelBytes[index + 1] = value; // G
+                pixelBytes[index + 2] = value; // B
             }
         }
         
