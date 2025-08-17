@@ -72,16 +72,32 @@ bool DesktopDisplay::init() {
         return false;
     }
     
-    // Load fonts
-    font = TTF_OpenFont("/System/Library/Fonts/Monaco.ttf", 12);
-    smallFont = TTF_OpenFont("/System/Library/Fonts/Monaco.ttf", 8);
+    // Load fonts - try multiple paths
+    const char* fontPaths[] = {
+        "/System/Library/Fonts/Monaco.ttf",
+        "/System/Library/Fonts/Courier New.ttf",
+        "/System/Library/Fonts/Menlo.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+        "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
+        nullptr
+    };
     
-    if (!font) {
-        // Try alternative font paths
-        font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 12);
+    for (int i = 0; fontPaths[i] && !font; i++) {
+        font = TTF_OpenFont(fontPaths[i], 12);
+        if (font) {
+            std::cout << "[Font] Loaded: " << fontPaths[i] << std::endl;
+        }
     }
-    if (!smallFont) {
-        smallFont = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 8);
+    
+    for (int i = 0; fontPaths[i] && !smallFont; i++) {
+        smallFont = TTF_OpenFont(fontPaths[i], 8);
+        if (smallFont) {
+            std::cout << "[Font] Small loaded: " << fontPaths[i] << std::endl;
+        }
+    }
+    
+    if (!font || !smallFont) {
+        std::cerr << "Warning: Could not load fonts. Text rendering may not work." << std::endl;
     }
     
     return true;
@@ -114,21 +130,43 @@ void DesktopDisplay::einkSetPixel(int x, int y, bool black) {
 void DesktopDisplay::einkDrawText(const std::string& text, int x, int y, int size) {
     if (!font) return;
     
-    SDL_Color color = {0, 0, 0}; // Black text
-    SDL_Surface* textSurface = TTF_RenderText_Solid(font, text.c_str(), color);
+    SDL_Color color = {0, 0, 0, 255}; // Black text
+    SDL_Surface* textSurface = TTF_RenderText_Blended(font, text.c_str(), color);
     if (!textSurface) return;
     
-    // Copy text to buffer (simplified)
+    // Clear area first
     for (int dy = 0; dy < textSurface->h && y + dy < EINK_HEIGHT; dy++) {
         for (int dx = 0; dx < textSurface->w && x + dx < EINK_WIDTH; dx++) {
-            Uint32* pixels = (Uint32*)textSurface->pixels;
-            Uint32 pixel = pixels[dy * textSurface->w + dx];
-            if ((pixel & 0xFF) < 128) { // If dark enough
+            einkSetPixel(x + dx, y + dy, false); // Clear to white
+        }
+    }
+    
+    // Copy text to buffer with proper pixel format handling
+    SDL_LockSurface(textSurface);
+    for (int dy = 0; dy < textSurface->h && y + dy < EINK_HEIGHT; dy++) {
+        for (int dx = 0; dx < textSurface->w && x + dx < EINK_WIDTH; dx++) {
+            Uint8* pixels = (Uint8*)textSurface->pixels;
+            int pixelIndex = dy * textSurface->pitch + dx * textSurface->format->BytesPerPixel;
+            
+            Uint32 pixel;
+            if (textSurface->format->BytesPerPixel == 4) {
+                pixel = *(Uint32*)(pixels + pixelIndex);
+            } else if (textSurface->format->BytesPerPixel == 3) {
+                pixel = pixels[pixelIndex] | (pixels[pixelIndex + 1] << 8) | (pixels[pixelIndex + 2] << 16);
+            } else {
+                continue;
+            }
+            
+            Uint8 r, g, b, a;
+            SDL_GetRGBA(pixel, textSurface->format, &r, &g, &b, &a);
+            
+            // If pixel is dark enough and not transparent
+            if (a > 128 && (r + g + b) / 3 < 128) {
                 einkSetPixel(x + dx, y + dy, true);
             }
         }
     }
-    
+    SDL_UnlockSurface(textSurface);
     SDL_FreeSurface(textSurface);
 }
 
@@ -193,21 +231,43 @@ void DesktopDisplay::oledSetPixel(int x, int y, bool on) {
 void DesktopDisplay::oledDrawText(const std::string& text, int x, int y, int size) {
     if (!smallFont) return;
     
-    SDL_Color color = {255, 255, 255}; // White text
-    SDL_Surface* textSurface = TTF_RenderText_Solid(smallFont, text.c_str(), color);
+    SDL_Color color = {255, 255, 255, 255}; // White text
+    SDL_Surface* textSurface = TTF_RenderText_Blended(smallFont, text.c_str(), color);
     if (!textSurface) return;
     
-    // Copy text to buffer (simplified)
+    // Clear area first
     for (int dy = 0; dy < textSurface->h && y + dy < OLED_HEIGHT; dy++) {
         for (int dx = 0; dx < textSurface->w && x + dx < OLED_WIDTH; dx++) {
-            Uint32* pixels = (Uint32*)textSurface->pixels;
-            Uint32 pixel = pixels[dy * textSurface->w + dx];
-            if ((pixel & 0xFF) > 128) { // If bright enough
+            oledSetPixel(x + dx, y + dy, false); // Clear to black
+        }
+    }
+    
+    // Copy text to buffer with proper pixel format handling
+    SDL_LockSurface(textSurface);
+    for (int dy = 0; dy < textSurface->h && y + dy < OLED_HEIGHT; dy++) {
+        for (int dx = 0; dx < textSurface->w && x + dx < OLED_WIDTH; dx++) {
+            Uint8* pixels = (Uint8*)textSurface->pixels;
+            int pixelIndex = dy * textSurface->pitch + dx * textSurface->format->BytesPerPixel;
+            
+            Uint32 pixel;
+            if (textSurface->format->BytesPerPixel == 4) {
+                pixel = *(Uint32*)(pixels + pixelIndex);
+            } else if (textSurface->format->BytesPerPixel == 3) {
+                pixel = pixels[pixelIndex] | (pixels[pixelIndex + 1] << 8) | (pixels[pixelIndex + 2] << 16);
+            } else {
+                continue;
+            }
+            
+            Uint8 r, g, b, a;
+            SDL_GetRGBA(pixel, textSurface->format, &r, &g, &b, &a);
+            
+            // If pixel is bright enough and not transparent
+            if (a > 128 && (r + g + b) / 3 > 128) {
                 oledSetPixel(x + dx, y + dy, true);
             }
         }
     }
-    
+    SDL_UnlockSurface(textSurface);
     SDL_FreeSurface(textSurface);
 }
 
@@ -347,9 +407,11 @@ void DesktopDisplay::updateEinkTexture() {
             for (int x = 0; x < EINK_WIDTH; x++) {
                 Uint8 value = einkBuffer[y * EINK_WIDTH + x];
                 int index = y * pitch + x * 3;
-                pixelBytes[index] = value;     // R
-                pixelBytes[index + 1] = value; // G
-                pixelBytes[index + 2] = value; // B
+                if (index + 2 < pitch * EINK_HEIGHT) {
+                    pixelBytes[index] = value;     // R
+                    pixelBytes[index + 1] = value; // G
+                    pixelBytes[index + 2] = value; // B
+                }
             }
         }
         
@@ -368,9 +430,11 @@ void DesktopDisplay::updateOledTexture() {
             for (int x = 0; x < OLED_WIDTH; x++) {
                 Uint8 value = oledBuffer[y * OLED_WIDTH + x];
                 int index = y * pitch + x * 3;
-                pixelBytes[index] = value;     // R
-                pixelBytes[index + 1] = value; // G
-                pixelBytes[index + 2] = value; // B
+                if (index + 2 < pitch * OLED_HEIGHT) {
+                    pixelBytes[index] = value;     // R
+                    pixelBytes[index + 1] = value; // G
+                    pixelBytes[index + 2] = value; // B
+                }
             }
         }
         
