@@ -463,15 +463,18 @@ void drawPokemonList() {
     Pokemon* pokemon = findPokemonById(searchResults[i]);
     if (!pokemon) continue;
     
-    // Highlight current selection
+    // Draw Pokemon entry first to get proper positioning
+    display.setCursor(10, y);
+    
+    // Highlight current selection - draw rectangle to cover full text height
     if (i == currentIndex) {
-      display.fillRect(5, y - 15, display.width() - 10, 18, GxEPD_BLACK);
+      display.fillRect(5, y - 16, display.width() - 10, 20, GxEPD_BLACK);
       display.setTextColor(GxEPD_WHITE);
     } else {
       display.setTextColor(GxEPD_BLACK);
     }
     
-    // Draw Pokemon entry
+    // Reset cursor after drawing rectangle
     display.setCursor(10, y);
     String entry = "#" + String(pokemon->id);
     if (pokemon->id < 10) entry = "#00" + String(pokemon->id);

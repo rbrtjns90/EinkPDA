@@ -32,6 +32,9 @@ bool DesktopDisplay::init() {
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0"); // Nearest neighbor scaling
     SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, "0"); // Disable fullscreen spaces
     SDL_SetHint(SDL_HINT_RENDER_BATCHING, "0"); // Disable render batching
+    SDL_SetHint(SDL_HINT_VIDEO_EXTERNAL_CONTEXT, "0"); // Disable external context
+    SDL_SetHint(SDL_HINT_RENDER_OPENGL_SHADERS, "0"); // Disable OpenGL shaders
+    SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1"); // Disable high DPI
     
     // Initialize SDL_ttf
     if (TTF_Init() == -1) {
@@ -199,9 +202,9 @@ void DesktopDisplay::einkDrawText(const std::string& text, int x, int y, int siz
     
     std::cout << "[SDL2] Drawing E-Ink text: '" << text << "' at (" << x << "," << y << ") size=" << size << " white=" << whiteText << std::endl;
     
-    // Use SDL_ttf to render text
+    // Use SDL_ttf to render text with UTF-8 encoding
     SDL_Color textColor = whiteText ? SDL_Color{255, 255, 255, 255} : SDL_Color{0, 0, 0, 255};
-    SDL_Surface* textSurface = TTF_RenderText_Solid(font, text.c_str(), textColor);
+    SDL_Surface* textSurface = TTF_RenderUTF8_Solid(font, text.c_str(), textColor);
     
     if (!textSurface) {
         std::cerr << "[SDL2] Failed to render text surface: " << TTF_GetError() << std::endl;
@@ -420,9 +423,9 @@ void DesktopDisplay::oledDrawText(const std::string& text, int x, int y, int siz
     
     if (text.empty()) return;
     
-    // Use SDL_ttf to render text
-    SDL_Color textColor = {255, 255, 255, 255}; // White text for OLED
-    SDL_Surface* textSurface = TTF_RenderText_Solid(font, text.c_str(), textColor);
+    // Use SDL_ttf to render text with UTF-8 encoding
+    SDL_Color textColor = {255, 255, 255, 255}; // White text on black background
+    SDL_Surface* textSurface = TTF_RenderUTF8_Solid(font, text.c_str(), textColor);
     
     if (!textSurface) {
         std::cerr << "[SDL2] Failed to render OLED text surface: " << TTF_GetError() << std::endl;
