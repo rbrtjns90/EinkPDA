@@ -293,6 +293,7 @@ This project welcomes contributions! Areas of interest include:
 ## Acknowledgments
 
 - **PokéAPI**: For providing comprehensive Pokémon data
+- **Periodic Table JSON**: For comprehensive periodic table data - https://github.com/Bowserinator/Periodic-Table-JSON
 - **E-ink Community**: For display technology insights
 - **Retro Computing Enthusiasts**: For inspiration and feedback
 
