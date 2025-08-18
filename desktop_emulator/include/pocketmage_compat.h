@@ -2,6 +2,18 @@
 #define POCKETMAGE_COMPAT_H
 
 // Comprehensive PocketMage compatibility header for desktop compilation
+
+// Debug output control - set to false to disable verbose terminal output
+#define EMULATOR_DEBUG_OUTPUT false
+
+// Debug macro for conditional output
+#if EMULATOR_DEBUG_OUTPUT
+#define DEBUG_PRINT(x) std::cout << x << std::endl
+#define DEBUG_LOG(tag, msg) std::cout << "[" << tag << "] " << msg << std::endl
+#else
+#define DEBUG_PRINT(x) do {} while(0)
+#define DEBUG_LOG(tag, msg) do {} while(0)
+#endif
 #include <iostream>
 #include <fstream>
 #include <filesystem>

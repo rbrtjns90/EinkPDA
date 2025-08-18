@@ -1,5 +1,7 @@
 #include "desktop_display_sdl2.h"
+#include "pocketmage_compat.h"
 #include <iostream>
+#include <string>
 #include <cstring>
 #include <algorithm>
 #include <cmath>
@@ -19,7 +21,7 @@ DesktopDisplay::~DesktopDisplay() {
 }
 
 bool DesktopDisplay::init() {
-    std::cout << "[SDL2] Initializing DesktopDisplay..." << std::endl;
+    DEBUG_LOG("SDL2", "Initializing DesktopDisplay...");
     
     // Force software rendering and disable Metal completely
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
@@ -137,13 +139,13 @@ bool DesktopDisplay::init() {
         std::cerr << "[SDL2] Warning: Could not load any font" << std::endl;
     }
 
-    std::cout << "[SDL2] DesktopDisplay initialized successfully" << std::endl;
+    DEBUG_LOG("SDL2", "DesktopDisplay initialized successfully");
     
     return true;
 }
 
 void DesktopDisplay::cleanup() {
-    std::cout << "[SDL2] Cleaning up DesktopDisplay..." << std::endl;
+    DEBUG_LOG("SDL2", "Cleaning up DesktopDisplay...");
     
     if (font) {
         TTF_CloseFont(font);
@@ -184,13 +186,13 @@ void DesktopDisplay::cleanup() {
     TTF_Quit();
     SDL_Quit();
     
-    std::cout << "[SDL2] DesktopDisplay cleanup complete" << std::endl;
+    DEBUG_LOG("SDL2", "DesktopDisplay cleanup complete");
 }
 
 // E-Ink display methods
 void DesktopDisplay::einkClear() {
     std::fill(einkBuffer.begin(), einkBuffer.end(), 255);
-    std::cout << "[SDL2] E-Ink cleared to white" << std::endl;
+    DEBUG_LOG("SDL2", "E-Ink cleared to white");
     updateEinkTexture();
 }
 
@@ -374,19 +376,19 @@ void DesktopDisplay::einkGetTextBounds(const char* text, int x, int y, int16_t* 
 }
 
 void DesktopDisplay::einkRefresh() {
-    std::cout << "[SDL2] E-Ink refresh - updating display" << std::endl;
+    DEBUG_LOG("SDL2", "E-Ink refresh - updating display");
     updateEinkTexture();
 }
 
 void DesktopDisplay::einkPartialRefresh() {
-    std::cout << "[SDL2] E-Ink partial refresh - updating display" << std::endl;
+    DEBUG_LOG("SDL2", "E-Ink partial refresh - updating display");
     updateEinkTexture();
 }
 
 // OLED display methods
 void DesktopDisplay::oledClear() {
     std::fill(oledBuffer.begin(), oledBuffer.end(), 0);
-    std::cout << "[SDL2] OLED cleared to black" << std::endl;
+    DEBUG_LOG("SDL2", "OLED cleared to black");
     updateOledTexture();
 }
 
@@ -535,7 +537,7 @@ void DesktopDisplay::oledDrawRect(int x, int y, int w, int h, bool filled, bool 
 }
 
 void DesktopDisplay::oledUpdate() {
-    std::cout << "[SDL2] OLED update - updating display" << std::endl;
+    DEBUG_LOG("SDL2", "OLED update - updating display");
     updateOledTexture();
 }
 

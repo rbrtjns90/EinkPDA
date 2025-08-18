@@ -8,6 +8,7 @@
 #include <vector>
 #include "desktop_display.h"
 #include "oled_service.h"
+#include "pocketmage_compat.h"
 
 extern DesktopDisplay* g_display;
 
@@ -30,6 +31,8 @@ public:
         textLines[2].clear();
     }
     void sendBuffer() {
+        // Send accumulated text to OLED service
+        DEBUG_LOG("OLED", "Rendering: '" + textLines[0] + "' / '" + textLines[1] + "' / '" + textLines[2] + "'");
         oled_set_lines(textLines[0].c_str(), textLines[1].c_str(), textLines[2].c_str());
     }
     void setFont(const uint8_t* font) {}

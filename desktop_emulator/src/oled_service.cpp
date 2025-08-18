@@ -1,5 +1,6 @@
 #include "oled_service.h"
 #include "U8g2lib.h"
+#include "pocketmage_compat.h"
 #include <iostream>
 #include <cstring>
 
@@ -61,6 +62,7 @@ void OledService::clear() {
 // C-style interface
 extern "C" {
     void oled_set_lines(const char* line1, const char* line2, const char* line3) {
+        DEBUG_LOG("OLED", "Setting lines: '" + std::string(line1 ? line1 : "") + "' / '" + std::string(line2 ? line2 : "") + "' / '" + std::string(line3 ? line3 : "") + "'");
         OledService::getInstance().setLines(
             line1 ? line1 : "",
             line2 ? line2 : "", 
