@@ -52,6 +52,7 @@ public:
     
     // Utility
     void present();
+    void renderOledText(const std::string& line1, const std::string& line2, const std::string& line3);
     
 private:
     SDL_Window* einkWindow;

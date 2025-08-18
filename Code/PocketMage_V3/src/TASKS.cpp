@@ -128,7 +128,7 @@ void processKB_TASKS() {
         //No char recieved
         if (inchar == 0);
         //BKSP Recieved
-        else if (inchar == 127 || inchar == 8 || inchar == 12) {
+        else if (inchar == 127 || inchar == 8 || inchar == 12 || inchar == 27) {
           CurrentAppState = HOME;
           currentLine     = "";
           CurrentKBState  = NORMAL;
@@ -194,7 +194,7 @@ void processKB_TASKS() {
           currentLine = "";
         }
         //BKSP Recieved
-        else if (inchar == 8 || inchar == 12) {                  
+        else if (inchar == 8 || inchar == 12 || inchar == 27) {                  
           if (currentLine.length() > 0) {
             currentLine.remove(currentLine.length() - 1);
           }
@@ -263,7 +263,7 @@ void processKB_TASKS() {
         //No char recieved
         if (inchar == 0);
         //BKSP Recieved
-        else if (inchar == 127 || inchar == 8 || inchar == 12) {
+        else if (inchar == 127 || inchar == 8 || inchar == 12 || inchar == 27) {
           CurrentTasksState = TASKS0;
           forceSlowFullUpdate = true;
           newState = true;

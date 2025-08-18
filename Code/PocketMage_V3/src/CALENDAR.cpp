@@ -881,7 +881,7 @@ void processKB_CALENDAR() {
         //No char recieved
         if (inchar == 0);  
         // HOME Recieved
-        else if (inchar == 12) {
+        else if (inchar == 12 || inchar == 27) {
           CurrentAppState = HOME;
           currentLine     = "";
           newState        = true;
@@ -953,7 +953,7 @@ void processKB_CALENDAR() {
         //No char recieved
         if (inchar == 0);  
         // HOME Recieved
-        else if (inchar == 12) {
+        else if (inchar == 12 || inchar == 27) {
           CurrentAppState = HOME;
           currentLine     = "";
           newState        = true;
@@ -1026,7 +1026,7 @@ void processKB_CALENDAR() {
         //No char recieved
         if (inchar == 0);  
         // HOME Recieved
-        else if (inchar == 12) {
+        else if (inchar == 12 || inchar == 27) {
           newEventState--;
           currentLine = "";
           if (newEventState < 0) {
@@ -1212,7 +1212,7 @@ void processKB_CALENDAR() {
         //No char recieved
         if (inchar == 0);  
         // HOME Recieved
-        else if (inchar == 12) {
+        else if (inchar == 12 || inchar == 27) {
           CurrentCalendarState = MONTH;
           currentLine     = "";
           newState        = true;
@@ -1444,7 +1444,7 @@ void processKB_CALENDAR() {
         //No char recieved
         if (inchar == 0);  
         // HOME Recieved
-        else if (inchar == 12) {
+        else if (inchar == 12 || inchar == 27) {
           CurrentCalendarState = MONTH;
           currentLine     = "";
           newState        = true;

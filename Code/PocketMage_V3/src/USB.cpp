@@ -197,7 +197,7 @@ void processKB_USB() {
     //No char recieved
     if (inchar == 0);   
     // Home recieved
-    else if (inchar == 12 || inchar == 8) {
+    else if (inchar == 12 || inchar == 8 || inchar == 27) {
       USBAppShutdown();
       CurrentAppState = HOME;
       currentLine     = "";

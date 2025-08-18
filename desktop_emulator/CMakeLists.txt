@@ -37,6 +37,7 @@ set(POCKETMAGE_SOURCES_MANUAL
     ${POCKETMAGE_SRC}/JOURNAL.cpp
     ${POCKETMAGE_SRC}/LEXICON.cpp
     ${POCKETMAGE_SRC}/POKEDEX.cpp
+    ${POCKETMAGE_SRC}/PERIODIC.cpp
     ${POCKETMAGE_SRC}/BT.cpp
 )
 
@@ -51,6 +52,7 @@ set(EMULATOR_SOURCES
     src/main_new.cpp
     src/desktop_display_sdl2.cpp
     src/hardware_shim.cpp
+    src/oled_service.cpp
 )
 
 # Create executable

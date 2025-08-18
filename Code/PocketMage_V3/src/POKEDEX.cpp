@@ -322,7 +322,7 @@ void processKB_POKEDEX() {
     switch (CurrentPokedexState) {
       case POKE_LIST:
         if (inchar == 0); // No input
-        else if (inchar == 12) { // ESC - Home
+        else if (inchar == 12 || inchar == 27) { // HOME or ESC - Home
           CurrentAppState = HOME;
           newState = true;
           CurrentKBState = NORMAL;
@@ -360,7 +360,7 @@ void processKB_POKEDEX() {
         
       case POKE_DETAIL:
         if (inchar == 0); // No input
-        else if (inchar == 8 || inchar == 12) { // BACKSPACE or ESC - Back to list
+        else if (inchar == 8 || inchar == 12 || inchar == 27) { // BACKSPACE, HOME, or ESC - Back to list
           CurrentPokedexState = POKE_LIST;
           newState = true;
           doFull = true;
@@ -383,7 +383,7 @@ void processKB_POKEDEX() {
         
       case POKE_SEARCH:
         if (inchar == 0); // No input
-        else if (inchar == 13) { // ENTER - Back to list
+        else if (inchar == 13 || inchar == 27) { // ENTER or ESC - Back to list
           CurrentPokedexState = POKE_LIST;
           newState = true;
           doFull = true;

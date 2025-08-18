@@ -93,8 +93,8 @@ volatile bool SDCARD_INSERT = false;
 bool noSD = false;
 volatile bool SDActive = false;
 
-const String appStateNames[] = { "txt", "filewiz", "usb", "bt", "settings", "tasks", "calendar", "journal", "lexicon", "pokedex" };
-const unsigned char *appIcons[10] = { _homeIcons2, _homeIcons3, _homeIcons4, _homeIcons5, _homeIcons6, taskIconTasks0, _homeIcons7, _homeIcons8, _homeIcons9, pokedexIcon};
+const String appStateNames[] = { "txt", "filewiz", "usb", "bt", "settings", "tasks", "calendar", "journal", "lexicon", "pokedex", "periodic" };
+const unsigned char *appIcons[11] = { _homeIcons2, _homeIcons3, _homeIcons4, _homeIcons5, _homeIcons6, taskIconTasks0, _homeIcons7, _homeIcons8, _homeIcons9, pokedexIcon, atomIcon};
 
 AppState CurrentAppState;
 

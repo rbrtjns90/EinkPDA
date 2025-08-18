@@ -1,8 +1,10 @@
 #include "pocketmage_compat.h"
 #include "desktop_display_sdl2.h"
+#include "oled_service.h"
 #include <iostream>
-#include <thread>
-#include <chrono>
+#include <csignal>
+#include <cstdlib>
+#include <string>
 
 // Include globals to access AppState enum
 enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
@@ -136,6 +138,18 @@ int main() {
         
         // Call the E-Ink handler to render UI
         applicationEinkHandler();
+        
+        // Present OLED updates on main thread (thread-safe)
+        oled_present_if_dirty();
+        
+        // Render OLED content directly via display system
+        char line1[32], line2[32], line3[32];
+        int valid;
+        oled_get_snapshot(line1, line2, line3, &valid);
+        if (valid && g_display) {
+            std::cout << "[OLED] Rendering: '" << line1 << "' / '" << line2 << "' / '" << line3 << "'" << std::endl;
+            g_display->renderOledText(std::string(line1), std::string(line2), std::string(line3));
+        }
         
         // Present only after all rendering is complete
         g_display->present();

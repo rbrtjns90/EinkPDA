@@ -3,6 +3,10 @@
 
 #include "globals.h"
 
+// Forward declarations
+void drawPERIODIC();
+void processKB_PERIODIC();
+
 //        .o.       ooooooooo.   ooooooooo.    .oooooo..o  //
 //       .888.      `888   `Y88. `888   `Y88. d8P'    `Y8  //
 //      .8"888.      888   .d88'  888   .d88' Y88bo.       //
@@ -51,6 +55,9 @@ void applicationEinkHandler() {
     case POKEDEX:
       einkHandler_POKEDEX();
       break;
+    case PERIODIC:
+      drawPERIODIC();
+      break;
     // ADD APP CASES HERE
     default:
       einkHandler_HOME();
@@ -97,6 +104,9 @@ void processKB() {
       break;
     case POKEDEX:
       processKB_POKEDEX();
+      break;
+    case PERIODIC:
+      processKB_PERIODIC();
       break;
     // ADD APP CASES HERE
     default:

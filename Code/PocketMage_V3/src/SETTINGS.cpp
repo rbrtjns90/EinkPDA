@@ -252,7 +252,7 @@ void processKB_settings() {
           }
         }
         // Home recieved
-        else if (inchar == 12) {
+        else if (inchar == 12 || inchar == 27) {
           CurrentAppState = HOME;
           currentLine     = "";
           newState        = true;

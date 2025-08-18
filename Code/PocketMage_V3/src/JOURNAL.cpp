@@ -277,7 +277,7 @@ void processKB_JOURNAL() {
           }
         }
         // Home recieved
-        else if (inchar == 12) {
+        else if (inchar == 12 || inchar == 27) {
           editingFile = bufferEditingFile;
           CurrentAppState = HOME;
           currentLine     = "";
@@ -313,7 +313,7 @@ void processKB_JOURNAL() {
       // HANDLE INPUTS
       //No char recieved
       if (inchar == 0);  
-      else if (inchar == 12) {
+      else if (inchar == 12 || inchar == 27) {
         JOURNAL_INIT();
       }
       //TAB Recieved

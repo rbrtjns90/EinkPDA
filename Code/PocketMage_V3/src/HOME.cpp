@@ -7,6 +7,9 @@
 //  o888o   o888o  `Y8bood8P'  o8o        o888o o888ooooood8  //
 #include "globals.h"
 
+// Forward declarations
+void PERIODIC_INIT();
+
 void commandSelect(String command) {
   std::cout << "[POCKETMAGE] commandSelect() called with: '" << command.c_str() << "'" << std::endl;
   command.toLowerCase();
@@ -126,6 +129,11 @@ void commandSelect(String command) {
     POKEDEX_INIT();
   }
   /////////////////////////////
+  else if (command == "periodic" || command == "elements" || command == "table" || command == "11") {
+    std::cout << "[POCKETMAGE] Matched periodic command! Calling PERIODIC_INIT()" << std::endl;
+    PERIODIC_INIT();
+  }
+  /////////////////////////////
   else if (command == "i farted") {
     oledWord("That smells");
     delay(1000);
@@ -193,7 +201,7 @@ void processKB_HOME() {
           currentLine += " ";
         }
         // Home recieved
-        else if (inchar == 12) {
+        else if (inchar == 12 || inchar == 27) {
           CurrentAppState = HOME;
           currentLine     = "";
           newState        = true;

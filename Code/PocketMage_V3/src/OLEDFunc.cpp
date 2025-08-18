@@ -6,6 +6,12 @@
 //  `88b    d88'  888       o  888       o  888     d88'  //
 //   `Y8bood8P'  o888ooooood8 o888ooooood8 o888bood8P'    //     
 #include "globals.h"
+
+#ifdef DESKTOP_EMULATOR
+extern "C" {
+  void oled_set_lines(const char* line1, const char* line2, const char* line3);
+}
+#endif
                                                      
 void oledWord(String word, bool allowLarge, bool showInfo) {
   u8g2.clearBuffer();

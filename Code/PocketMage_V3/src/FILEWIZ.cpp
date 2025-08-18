@@ -33,7 +33,7 @@ void processKB_FILEWIZ() {
         //No char recieved
         if (inchar == 0);
         //BKSP Recieved
-        else if (inchar == 127 || inchar == 8 || inchar == 12) {
+        else if (inchar == 127 || inchar == 8 || inchar == 12 || inchar == 27) {
           CurrentAppState = HOME;
           currentLine     = "";
           CurrentKBState  = NORMAL;
@@ -74,7 +74,7 @@ void processKB_FILEWIZ() {
         //No char recieved
         if (inchar == 0);
         //BKSP Recieved
-        else if (inchar == 127 || inchar == 8 || inchar == 12) {
+        else if (inchar == 127 || inchar == 8 || inchar == 12 || inchar == 27) {
           CurrentFileWizState = WIZ0_;
           newState = true;
           break;
@@ -120,7 +120,7 @@ void processKB_FILEWIZ() {
         //No char recieved
         if (inchar == 0);
         //BKSP Recieved
-        else if (inchar == 127 || inchar == 8 || inchar == 12) {
+        else if (inchar == 127 || inchar == 8 || inchar == 12 || inchar == 27) {
           CurrentFileWizState = WIZ1_;
           newState = true;
           break;

@@ -34,7 +34,8 @@ extern const unsigned char _homeIcons7 [] PROGMEM;
 extern const unsigned char _homeIcons8 [] PROGMEM;
 extern const unsigned char _homeIcons9 [] PROGMEM;
 extern const unsigned char pokedexIcon [] PROGMEM;
-extern const unsigned char* homeIconsAllArray[9];
+extern const unsigned char atomIcon [] PROGMEM;
+extern const unsigned char* homeIconsAllArray[10];
 
 //
 extern const unsigned char fileWizardfileWiz0 [] PROGMEM;

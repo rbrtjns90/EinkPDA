@@ -512,7 +512,7 @@ void processKB_TXT_NEW() {
         // HANDLE INPUTS
         //No char recieved
         if (inchar == 0);  
-        else if (inchar == 12) {
+        else if (inchar == 12 || inchar == 27) {
           CurrentAppState = HOME;
           currentLine     = "";
           newState        = true;
