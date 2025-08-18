@@ -24,6 +24,8 @@ void loadPokemonData();
 bool loadBinaryPokemonData();
 void loadSamplePokemonData();
 String loadStringFromTable(const char* filename, uint16_t index);
+bool loadPokemonSprite(uint16_t pokemonId, uint8_t* spriteBuffer, size_t bufferSize);
+void drawSprite(int x, int y, const uint8_t* spriteData, int width, int height);
 void rebuildSearch();
 void updatePokedexOLED();
 void drawPokemonList();
@@ -132,6 +134,97 @@ void loadSamplePokemonData() {
   pokemonList.push_back(pikachu);
   
   std::cout << "[POKEDEX] Loaded " << pokemonList.size() << " Pokemon" << std::endl;
+}
+
+bool loadPokemonSprite(uint16_t pokemonId, uint8_t* spriteBuffer, size_t bufferSize) {
+  // Load sprite from pokemon_sprites.bin file
+  FILE* spriteFile = fopen("./data/pokemon/pokemon_sprites.bin", "rb");
+  if (!spriteFile) {
+    std::cout << "[POKEDEX] Could not open pokemon_sprites.bin" << std::endl;
+    return false;
+  }
+  
+  // Read header: count (2 bytes)
+  uint16_t spriteCount;
+  if (fread(&spriteCount, 2, 1, spriteFile) != 1) {
+    std::cout << "[POKEDEX] Error reading sprite count" << std::endl;
+    fclose(spriteFile);
+    return false;
+  }
+  
+  // Validate Pokemon ID
+  if (pokemonId == 0 || pokemonId > spriteCount) {
+    std::cout << "[POKEDEX] Invalid Pokemon ID for sprite: " << pokemonId << std::endl;
+    fclose(spriteFile);
+    return false;
+  }
+  
+  // Read offset for this Pokemon (4 bytes each, 0-indexed)
+  uint32_t spriteOffset;
+  fseek(spriteFile, 2 + (pokemonId - 1) * 4, SEEK_SET);
+  if (fread(&spriteOffset, 4, 1, spriteFile) != 1) {
+    std::cout << "[POKEDEX] Error reading sprite offset for Pokemon " << pokemonId << std::endl;
+    fclose(spriteFile);
+    return false;
+  }
+  
+  // Seek to sprite data location (after header)
+  uint32_t dataStart = 2 + spriteCount * 4;
+  fseek(spriteFile, dataStart + spriteOffset, SEEK_SET);
+  
+  // Read sprite size (2 bytes)
+  uint16_t spriteSize;
+  if (fread(&spriteSize, 2, 1, spriteFile) != 1) {
+    std::cout << "[POKEDEX] Error reading sprite size for Pokemon " << pokemonId << std::endl;
+    fclose(spriteFile);
+    return false;
+  }
+  
+  // Validate buffer size
+  if (spriteSize > bufferSize) {
+    std::cout << "[POKEDEX] Sprite too large for buffer: " << spriteSize << " > " << bufferSize << std::endl;
+    fclose(spriteFile);
+    return false;
+  }
+  
+  // Read sprite data
+  if (fread(spriteBuffer, 1, spriteSize, spriteFile) != spriteSize) {
+    std::cout << "[POKEDEX] Error reading sprite data for Pokemon " << pokemonId << std::endl;
+    fclose(spriteFile);
+    return false;
+  }
+  
+  fclose(spriteFile);
+  std::cout << "[POKEDEX] Loaded sprite for Pokemon " << pokemonId << " (" << spriteSize << " bytes)" << std::endl;
+  return true;
+}
+
+void drawSprite(int x, int y, const uint8_t* spriteData, int width, int height) {
+  // Draw 1-bit bitmap sprite to E-Ink display
+  // Sprite format: 1 bit per pixel, packed into bytes (8 pixels per byte)
+  
+  for (int row = 0; row < height; row++) {
+    for (int col = 0; col < width; col += 8) {
+      int byteIndex = (row * width + col) / 8;
+      uint8_t pixelByte = spriteData[byteIndex];
+      
+      for (int bit = 0; bit < 8 && (col + bit) < width; bit++) {
+        int pixelX = x + col + bit;
+        int pixelY = y + row;
+        
+        // Check if pixel is within display bounds
+        if (pixelX >= 0 && pixelX < display.width() && pixelY >= 0 && pixelY < display.height()) {
+          // Extract bit (MSB first) - bit set means black pixel in original image
+          bool isBlack = (pixelByte & (1 << (7 - bit))) != 0;
+          
+          // Invert the logic: bit set (1) means white background, bit clear (0) means black foreground
+          if (!isBlack) {
+            display.drawPixel(pixelX, pixelY, GxEPD_BLACK);
+          }
+        }
+      }
+    }
+  }
 }
 
 bool loadBinaryPokemonData() {
@@ -511,7 +604,21 @@ void drawPokemonDetail(uint16_t pokemonId) {
   display.fillScreen(GxEPD_WHITE);
   display.setTextColor(GxEPD_BLACK);
   
-  // Pokemon name and ID
+  // Load and draw Pokemon sprite (64x64 pixels)
+  uint8_t spriteBuffer[512]; // 64*64/8 = 512 bytes for 1-bit bitmap
+  bool spriteLoaded = loadPokemonSprite(pokemon->id, spriteBuffer, sizeof(spriteBuffer));
+  
+  if (spriteLoaded) {
+    // Draw sprite in top-right corner
+    int spriteX = display.width() - 74; // 64px sprite + 10px margin
+    int spriteY = 10;
+    drawSprite(spriteX, spriteY, spriteBuffer, 64, 64);
+    
+    // Draw border around sprite
+    display.drawRect(spriteX - 1, spriteY - 1, 66, 66, GxEPD_BLACK);
+  }
+  
+  // Pokemon name and ID (adjust layout for sprite)
   display.setFont(&FreeMonoBold9pt7b);
   display.setCursor(10, 20);
   String title = "#" + String(pokemon->id) + "  " + pokemon->name;
