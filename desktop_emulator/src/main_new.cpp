@@ -1,5 +1,5 @@
 #include "pocketmage_compat.h"
-#include "desktop_display.h"
+#include "desktop_display_sdl2.h"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -7,8 +7,8 @@
 // Include globals to access AppState enum
 enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
 
-// Desktop emulator globals
-DesktopDisplay* g_display = nullptr;
+// Desktop emulator globals - declared in desktop_display_sdl2.cpp
+extern DesktopDisplay* g_display;
 
 // Forward declarations for real PocketMage functions
 void setup();
@@ -33,6 +33,9 @@ extern void SETTINGS_INIT();
 extern void CALENDAR_INIT();
 extern void JOURNAL_INIT();
 extern void LEXICON_INIT();
+
+// Forward declare the application handler
+extern void applicationEinkHandler();
 
 // Emulator-specific setup
 void emulatorSetup() {
@@ -70,13 +73,31 @@ void emulatorSetup() {
     // Give setup time to initialize
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
     std::cout << "PocketMage setup() started" << std::endl;
+    
+    // Force initial drawing to populate the framebuffers
+    std::cout << "Drawing initial HOME screen..." << std::endl;
+    
+    // Force PocketMage to redraw HOME screen by setting newState = true
+    extern volatile bool newState;
+    newState = true;
+    
+    std::cout << "Calling PocketMage HOME handler..." << std::endl;
+    applicationEinkHandler();
+    g_display->present();
+    std::cout << "Initial drawing complete." << std::endl;
 }
-
-// Forward declare the application handler
-extern void applicationEinkHandler();
 
 // Emulator-specific loop
 void emulatorLoop() {
+    static int frameCount = 0;
+    frameCount++;
+    
+    // Force HOME screen redraw every 60 frames to show icons
+    if (frameCount % 60 == 0) {
+        extern volatile bool newState;
+        newState = true;
+    }
+    
     // Handle SDL events first
     if (!g_display->handleEvents()) {
         return; // Quit requested

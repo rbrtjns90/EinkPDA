@@ -22,15 +22,24 @@ set(POCKETMAGE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../Code/PocketMage_V3)
 set(POCKETMAGE_SRC ${POCKETMAGE_ROOT}/src)
 set(POCKETMAGE_INCLUDE ${POCKETMAGE_ROOT}/include)
 
-# Add PocketMage source files (exclude sysFunc.cpp to avoid updateKeypress conflict)
-file(GLOB_RECURSE POCKETMAGE_SOURCES 
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Code/PocketMage_V3/src/*.cpp"
-)
-# Remove problematic files to avoid compilation issues
-list(FILTER POCKETMAGE_SOURCES EXCLUDE REGEX ".*sysFunc\\.cpp$")
-list(FILTER POCKETMAGE_SOURCES EXCLUDE REGEX ".*USB\\.cpp$")
 list(FILTER POCKETMAGE_SOURCES EXCLUDE REGEX ".*OLEDFunc\\.cpp$")
-list(FILTER POCKETMAGE_SOURCES EXCLUDE REGEX ".*einkFunc\\.cpp$")
+# PocketMage source files (actual app code) - sysFunc.cpp excluded due to updateKeypress conflict
+set(POCKETMAGE_SOURCES_MANUAL
+    ${POCKETMAGE_SRC}/globals.cpp
+    ${POCKETMAGE_SRC}/assets.cpp
+    ${POCKETMAGE_SRC}/PocketMageV3.cpp
+    # ${POCKETMAGE_SRC}/USB.cpp  # Excluded - requires ESP32-specific headers
+    ${POCKETMAGE_SRC}/TXT.cpp
+    ${POCKETMAGE_SRC}/FILEWIZ.cpp
+    ${POCKETMAGE_SRC}/TASKS.cpp
+    ${POCKETMAGE_SRC}/CALENDAR.cpp
+    ${POCKETMAGE_SRC}/SETTINGS.cpp
+    ${POCKETMAGE_SRC}/HOME.cpp
+    ${POCKETMAGE_SRC}/JOURNAL.cpp
+    ${POCKETMAGE_SRC}/LEXICON.cpp
+    ${POCKETMAGE_SRC}/POKEDEX.cpp
+    ${POCKETMAGE_SRC}/BT.cpp
+)
 
 # Include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -38,34 +47,16 @@ include_directories(${POCKETMAGE_INCLUDE})
 include_directories(${SDL2_INCLUDE_DIRS})
 include_directories(${SDL2_TTF_INCLUDE_DIRS})
 
-# PocketMage source files (actual app code) - sysFunc.cpp excluded due to updateKeypress conflict
-set(POCKETMAGE_SOURCES_MANUAL
-    ${POCKETMAGE_SRC}/globals.cpp
-    ${POCKETMAGE_SRC}/assets.cpp
-    ${POCKETMAGE_SRC}/PocketMageV3.cpp
-    # ../Code/PocketMage_V3/src/USB.cpp  # Excluded - requires ESP32-specific headers
-    ${POCKETMAGE_SRC}/TXT.cpp
-    ${POCKETMAGE_SRC}/FILEWIZ.cpp
-    ${POCKETMAGE_SRC}/TASKS.cpp
-    ${POCKETMAGE_SRC}/CALENDAR.cpp
-    ${POCKETMAGE_SRC}/settings.cpp
-    ${POCKETMAGE_SRC}/HOME.cpp
-    ${POCKETMAGE_SRC}/JOURNAL.cpp
-    ${POCKETMAGE_SRC}/LEXICON.cpp
-    ${POCKETMAGE_SRC}/POKEDEX.cpp
-)
-
-# Desktop emulator source files
+# Emulator-specific source files
 set(EMULATOR_SOURCES
     src/main_new.cpp
-    src/desktop_display.cpp
+    src/desktop_display_sdl2.cpp
     src/hardware_shim.cpp
 )
 
 # Create executable
 add_executable(${PROJECT_NAME} 
     ${EMULATOR_SOURCES}
-    ${POCKETMAGE_SOURCES}
     ${POCKETMAGE_SOURCES_MANUAL}
 )
 

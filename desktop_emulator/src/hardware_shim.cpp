@@ -644,9 +644,13 @@ void einkTextDynamic(bool refresh, bool clear) {
         // Calculate starting line based on scroll
         int startLine = std::max(0, (int)allLines.size() - maxLines + (int)dynamicScroll);
         
+        // Debug: Show what we're trying to render
+        std::cout << "[EinkTextDynamic] allLines.size()=" << allLines.size() << " currentLine='" << currentLine << "'" << std::endl;
+        
         // Render lines from allLines vector
         for (int i = startLine; i < allLines.size() && y < 100; i++) {
             if (i >= 0 && allLines[i].length() > 0) {
+                std::cout << "[EinkTextDynamic] Drawing line " << i << ": '" << allLines[i] << "'" << std::endl;
                 g_display->einkDrawText(allLines[i].c_str(), 5, y, 12);
             }
             y += lineHeight;
@@ -654,6 +658,7 @@ void einkTextDynamic(bool refresh, bool clear) {
         
         // Render current line being typed
         if (currentLine.length() > 0 && y < 100) {
+            std::cout << "[EinkTextDynamic] Drawing current line: '" << currentLine << "'" << std::endl;
             g_display->einkDrawText(currentLine.c_str(), 5, y, 12);
         }
     }

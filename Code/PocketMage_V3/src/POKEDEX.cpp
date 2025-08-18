@@ -21,7 +21,9 @@ struct Pokemon {
 
 // Forward declarations
 void loadPokemonData();
+bool loadBinaryPokemonData();
 void loadSamplePokemonData();
+String loadStringFromTable(const char* filename, uint16_t index);
 void rebuildSearch();
 void updatePokedexOLED();
 void drawPokemonList();
@@ -64,17 +66,11 @@ void loadPokemonData() {
   
   pokemonList.clear();
   
-  // Try to load from SD card first
-  if (!noSD) {
-    File file = SD_MMC.open("/pokemon_data/data/pokemon_simplified.json");
-    if (file) {
-      std::cout << "[POKEDEX] Loading from SD card..." << std::endl;
-      // For now, load sample data - full JSON parsing would require ArduinoJson library
-      loadSamplePokemonData();
-      file.close();
-      pokemonDataLoaded = true;
-      return;
-    }
+  // Try to load from binary files
+  if (loadBinaryPokemonData()) {
+    std::cout << "[POKEDEX] Loaded " << pokemonList.size() << " Pokemon from binary data" << std::endl;
+    pokemonDataLoaded = true;
+    return;
   }
   
   // Fallback to sample data
@@ -136,6 +132,137 @@ void loadSamplePokemonData() {
   pokemonList.push_back(pikachu);
   
   std::cout << "[POKEDEX] Loaded " << pokemonList.size() << " Pokemon" << std::endl;
+}
+
+bool loadBinaryPokemonData() {
+  std::cout << "[POKEDEX] Attempting to load binary Pokemon data..." << std::endl;
+  
+  // Try to open the Pokemon records file
+  FILE* recordFile = fopen("./data/pokemon/pokemon_data.rec", "rb");
+  if (!recordFile) {
+    std::cout << "[POKEDEX] Could not open pokemon_data.rec" << std::endl;
+    return false;
+  }
+  
+  // Get file size
+  fseek(recordFile, 0, SEEK_END);
+  size_t fileSize = ftell(recordFile);
+  fseek(recordFile, 0, SEEK_SET);
+  
+  size_t numRecords = fileSize / 32; // 32 bytes per record
+  std::cout << "[POKEDEX] Found " << numRecords << " Pokemon records" << std::endl;
+  
+  // Type mapping
+  const char* typeNames[] = {"", "Normal", "Fire", "Water", "Electric", "Grass",
+    "Ice", "Fighting", "Poison", "Ground", "Flying", "Psychic", "Bug", 
+    "Rock", "Ghost", "Dragon", "Dark", "Steel", "Fairy"};
+  
+  for (size_t i = 0; i < numRecords; i++) {
+    // Read 32-byte record
+    uint8_t recordData[32];
+    if (fread(recordData, 1, 32, recordFile) != 32) {
+      std::cout << "[POKEDEX] Error reading record " << i << std::endl;
+      break;
+    }
+    
+    // Parse record data (little-endian)
+    uint16_t id = recordData[0] | (recordData[1] << 8);
+    uint16_t height = recordData[2] | (recordData[3] << 8);
+    uint16_t weight = recordData[4] | (recordData[5] << 8);
+    uint8_t hp = recordData[6];
+    uint8_t attack = recordData[7];
+    uint8_t defense = recordData[8];
+    uint8_t sp_attack = recordData[9];
+    uint8_t sp_defense = recordData[10];
+    uint8_t speed = recordData[11];
+    uint8_t type1 = recordData[12];
+    uint8_t type2 = recordData[13];
+    uint16_t genus_offset = recordData[14] | (recordData[15] << 8);
+    uint16_t flavor_offset = recordData[16] | (recordData[17] << 8);
+    
+    // Create Pokemon struct
+    Pokemon pokemon;
+    pokemon.id = id;
+    pokemon.height_cm = height;
+    pokemon.weight_hg = weight;
+    pokemon.stats[0] = hp;
+    pokemon.stats[1] = attack;
+    pokemon.stats[2] = defense;
+    pokemon.stats[3] = sp_attack;
+    pokemon.stats[4] = sp_defense;
+    pokemon.stats[5] = speed;
+    
+    // Load name from string table
+    pokemon.name = loadStringFromTable("pokemon_names.str", i);
+    
+    // Build type string
+    pokemon.types = String(typeNames[type1]);
+    if (type2 > 0 && type2 < 19) {
+      pokemon.types += "/" + String(typeNames[type2]);
+    }
+    
+    // Load genus and flavor text
+    pokemon.genus = loadStringFromTable("pokemon_genus.str", genus_offset);
+    pokemon.flavor_text = loadStringFromTable("pokemon_flavor.str", flavor_offset);
+    
+    // Set image filename
+    pokemon.image_file = String(id) + "_front.png";
+    if (id < 10) pokemon.image_file = "00" + pokemon.image_file;
+    else if (id < 100) pokemon.image_file = "0" + pokemon.image_file;
+    
+    pokemonList.push_back(pokemon);
+  }
+  
+  fclose(recordFile);
+  return pokemonList.size() > 0;
+}
+
+String loadStringFromTable(const char* filename, uint16_t index) {
+  String filepath = String("./data/pokemon/") + filename;
+  
+  FILE* file = fopen(filepath.c_str(), "rb");
+  if (!file) {
+    std::cout << "[POKEDEX] Could not open " << filename << std::endl;
+    return "Unknown";
+  }
+  
+  // Read count (little-endian)
+  uint8_t countBytes[2];
+  if (fread(countBytes, 1, 2, file) != 2) {
+    fclose(file);
+    return "Unknown";
+  }
+  uint16_t count = countBytes[0] | (countBytes[1] << 8);
+  
+  if (index >= count) {
+    fclose(file);
+    return "Unknown";
+  }
+  
+  // Read offset for this index
+  fseek(file, 2 + index * 2, SEEK_SET);
+  uint8_t offsetBytes[2];
+  if (fread(offsetBytes, 1, 2, file) != 2) {
+    fclose(file);
+    return "Unknown";
+  }
+  uint16_t offset = offsetBytes[0] | (offsetBytes[1] << 8);
+  
+  // Calculate string data start position
+  uint16_t stringDataStart = 2 + count * 2;
+  
+  // Seek to string position
+  fseek(file, stringDataStart + offset, SEEK_SET);
+  
+  // Read null-terminated string
+  String result = "";
+  char c;
+  while (fread(&c, 1, 1, file) == 1 && c != '\0') {
+    result += c;
+  }
+  
+  fclose(file);
+  return result;
 }
 
 void rebuildSearch() {
@@ -285,7 +412,10 @@ void processKB_POKEDEX() {
 }
 
 void einkHandler_POKEDEX() {
-  if (newState) {
+  static bool rendering = false;
+  
+  if (newState && !rendering) {
+    rendering = true;
     std::cout << "[POKEDEX] einkHandler_POKEDEX() called - state=" << CurrentPokedexState << std::endl;
     
     switch (CurrentPokedexState) {
@@ -305,6 +435,7 @@ void einkHandler_POKEDEX() {
     refresh();
     newState = false;
     doFull = false;
+    rendering = false;
   }
 }
 
@@ -462,19 +593,22 @@ void updatePokedexOLED() {
   // u8g2.setFont(u8g2_font_5x7_mf); // Font not available in emulator
   
   switch (CurrentPokedexState) {
-    case POKE_LIST:
+    case POKE_LIST: {
       u8g2.setCursor(0, 8);
       u8g2.print("Pokedex");
       u8g2.setCursor(0, 18);
       u8g2.print("Found: ");
-      u8g2.print(searchResults.size());
+      // Safe conversion to avoid potential issues with size_t
+      int resultCount = static_cast<int>(searchResults.size());
+      u8g2.print(resultCount);
       u8g2.setCursor(0, 28);
-      if (searchResults.size() > 0) {
+      if (resultCount > 0) {
         u8g2.print((currentIndex + 1));
         u8g2.print("/");
-        u8g2.print(searchResults.size());
+        u8g2.print(resultCount);
       }
       break;
+    }
       
     case POKE_DETAIL:
       if (searchResults.size() > 0 && currentIndex < searchResults.size()) {
