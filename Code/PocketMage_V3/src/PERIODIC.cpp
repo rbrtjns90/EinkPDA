@@ -378,6 +378,9 @@ void processKB_PERIODIC() {
       periodic::in_detail = false;
       newState = true;
       doFull = true;
+      // Force immediate screen clear when returning to table view
+      display.fillScreen(GxEPD_WHITE);
+      refresh();
       KBBounceMillis = currentMillis;  // Set bounce time
       return;
     }
@@ -442,6 +445,9 @@ void processKB_PERIODIC() {
       periodic::in_detail = true;
       newState = true;
       doFull = true;
+      // Force immediate screen clear when entering detail view
+      display.fillScreen(GxEPD_WHITE);
+      refresh();
     }
   }
   else if (inchar == 27 || inchar == 12) {  // ESC or HOME - exit app
