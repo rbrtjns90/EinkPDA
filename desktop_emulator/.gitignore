@@ -17,3 +17,5 @@ Thumbs.db
 
 # Executable
 PocketMage_Desktop_Emulator
+
+venv/*
