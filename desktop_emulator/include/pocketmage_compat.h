@@ -473,7 +473,7 @@ public:
         }
     }
     void setRotation(uint8_t r) {}
-    void setTextColor(uint16_t color) {}
+    void setTextColor(uint16_t color) { text_color = color; }
     void setFullWindow() {}
     void fillScreen(uint16_t color) {
         if (g_display) g_display->einkClear();
@@ -492,7 +492,8 @@ public:
     void print(const char* text) {
         if (g_display && text) {
             std::cout << "[DISPLAY] Drawing text: '" << text << "' at (" << cursor_x << "," << cursor_y << ")" << std::endl;
-            g_display->einkDrawText(text, cursor_x, cursor_y);
+            bool isWhiteText = (text_color == GxEPD_WHITE);
+            g_display->einkDrawText(text, cursor_x, cursor_y, 12, isWhiteText);
             cursor_x += strlen(text) * 8;
             g_display->present(); // Force immediate rendering
         }
@@ -539,7 +540,9 @@ public:
     void setPartialWindow(int x, int y, int w, int h) {}
     
 private:
-    int cursor_x = 0, cursor_y = 0;
+    int cursor_x = 0;
+    int cursor_y = 0;
+    uint16_t text_color = GxEPD_BLACK;
 };
 
 // Template compatibility for GxEPD2_BW

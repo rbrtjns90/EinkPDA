@@ -30,6 +30,8 @@ bool DesktopDisplay::init() {
     // Force software rendering to avoid Metal GPU issues
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0"); // Nearest neighbor scaling
+    SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, "0"); // Disable fullscreen spaces
+    SDL_SetHint(SDL_HINT_RENDER_BATCHING, "0"); // Disable render batching
     
     // Initialize SDL_ttf
     if (TTF_Init() == -1) {
@@ -192,13 +194,13 @@ void DesktopDisplay::einkSetPixel(int x, int y, bool black) {
     }
 }
 
-void DesktopDisplay::einkDrawText(const std::string& text, int x, int y, int size) {
+void DesktopDisplay::einkDrawText(const std::string& text, int x, int y, int size, bool whiteText) {
     if (text.empty() || !font) return;
     
-    std::cout << "[SDL2] Drawing E-Ink text: '" << text << "' at (" << x << "," << y << ") size=" << size << std::endl;
+    std::cout << "[SDL2] Drawing E-Ink text: '" << text << "' at (" << x << "," << y << ") size=" << size << " white=" << whiteText << std::endl;
     
     // Use SDL_ttf to render text
-    SDL_Color textColor = {0, 0, 0, 255}; // Black text
+    SDL_Color textColor = whiteText ? SDL_Color{255, 255, 255, 255} : SDL_Color{0, 0, 0, 255};
     SDL_Surface* textSurface = TTF_RenderText_Solid(font, text.c_str(), textColor);
     
     if (!textSurface) {
@@ -231,9 +233,16 @@ void DesktopDisplay::einkDrawText(const std::string& text, int x, int y, int siz
                 // Write to framebuffer (0 = black, 255 = white)
                 int fbIndex = (y + dy) * EINK_WIDTH + (x + dx);
                 if (fbIndex >= 0 && fbIndex < (int)einkBuffer.size()) {
-                    // SDL_ttf renders black text as low values, use any non-zero pixel
-                    if (intensity > 0) {
-                        einkBuffer[fbIndex] = 0; // Black text
+                    if (whiteText) {
+                        // For white text, write white pixels where text exists
+                        if (intensity > 0) {
+                            einkBuffer[fbIndex] = 255; // White text
+                        }
+                    } else {
+                        // For black text, write black pixels where text exists
+                        if (intensity > 0) {
+                            einkBuffer[fbIndex] = 0; // Black text
+                        }
                     }
                 }
             }
@@ -519,19 +528,19 @@ bool DesktopDisplay::handleEvents() {
             // Map special keys for PocketMage compatibility
             switch (e.key.keysym.sym) {
                 case SDLK_UP:
-                    lastKey = 'U';
+                    lastKey = 19;  // ASCII 19 - UP arrow for PocketMage
                     std::cout << "[KEYBOARD] Mapped to UP arrow" << std::endl;
                     break;
                 case SDLK_DOWN:
-                    lastKey = 'D';
+                    lastKey = 21;  // ASCII 21 - DOWN arrow for PocketMage
                     std::cout << "[KEYBOARD] Mapped to DOWN arrow" << std::endl;
                     break;
                 case SDLK_LEFT:
-                    lastKey = 'L';
+                    lastKey = 20;  // ASCII 20 - LEFT arrow for PocketMage
                     std::cout << "[KEYBOARD] Mapped to LEFT arrow" << std::endl;
                     break;
                 case SDLK_RIGHT:
-                    lastKey = 'R';
+                    lastKey = 18;  // ASCII 18 - RIGHT arrow for PocketMage
                     std::cout << "[KEYBOARD] Mapped to RIGHT arrow" << std::endl;
                     break;
                 case SDLK_ESCAPE:

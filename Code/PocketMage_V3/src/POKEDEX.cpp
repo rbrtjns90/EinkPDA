@@ -210,6 +210,11 @@ bool loadBinaryPokemonData() {
     if (id < 10) pokemon.image_file = "00" + pokemon.image_file;
     else if (id < 100) pokemon.image_file = "0" + pokemon.image_file;
     
+    // Debug output for first few Pokemon
+    if (i < 5) {
+      std::cout << "[POKEDEX] Loaded Pokemon #" << id << ": " << pokemon.name.c_str() << std::endl;
+    }
+    
     pokemonList.push_back(pokemon);
   }
   
@@ -487,9 +492,18 @@ void drawPokemonList() {
 
 void drawPokemonDetail(uint16_t pokemonId) {
   std::cout << "[POKEDEX] Drawing Pokemon detail for ID " << pokemonId << std::endl;
+  std::cout << "[POKEDEX] Current index: " << currentIndex << ", searchResults size: " << searchResults.size() << std::endl;
   
   Pokemon* pokemon = findPokemonById(pokemonId);
-  if (!pokemon) return;
+  if (!pokemon) {
+    std::cout << "[POKEDEX] ERROR: Could not find Pokemon with ID " << pokemonId << std::endl;
+    std::cout << "[POKEDEX] Available Pokemon IDs: ";
+    for (size_t i = 0; i < std::min((size_t)10, pokemonList.size()); i++) {
+      std::cout << pokemonList[i].id << " ";
+    }
+    std::cout << std::endl;
+    return;
+  }
   
   display.fillScreen(GxEPD_WHITE);
   display.setTextColor(GxEPD_BLACK);
@@ -589,6 +603,9 @@ void drawSearchScreen() {
 }
 
 void updatePokedexOLED() {
+  // Skip OLED updates to avoid segfault - focus on E-Ink display
+  return;
+  
   u8g2.clearBuffer();
   // u8g2.setFont(u8g2_font_5x7_mf); // Font not available in emulator
   

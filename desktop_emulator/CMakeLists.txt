@@ -22,7 +22,6 @@ set(POCKETMAGE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../Code/PocketMage_V3)
 set(POCKETMAGE_SRC ${POCKETMAGE_ROOT}/src)
 set(POCKETMAGE_INCLUDE ${POCKETMAGE_ROOT}/include)
 
-list(FILTER POCKETMAGE_SOURCES EXCLUDE REGEX ".*OLEDFunc\\.cpp$")
 # PocketMage source files (actual app code) - sysFunc.cpp excluded due to updateKeypress conflict
 set(POCKETMAGE_SOURCES_MANUAL
     ${POCKETMAGE_SRC}/globals.cpp
