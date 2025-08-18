@@ -33,7 +33,7 @@ if (NOT _sdl_config_ok)
   target_link_libraries(SDL2_ttf::SDL2_ttf INTERFACE ${SDL2_TTF_LIBRARIES})
 endif()
 
-# Homebrew helper for macOS (kept from your original setup)
+# Homebrew helper for macOS 
 if(APPLE)
   execute_process(COMMAND brew --prefix OUTPUT_VARIABLE HOMEBREW_PREFIX OUTPUT_STRIP_TRAILING_WHITESPACE)
   list(APPEND CMAKE_PREFIX_PATH "${HOMEBREW_PREFIX}")
