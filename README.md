@@ -1,4 +1,4 @@
-# EinkPDA
+# PocketMage PDA
 [Please note that this project is a work in progress and incomplete]
 
 @Ashtf 2025
