@@ -1,0 +1,161 @@
+# This starter workflow is for a CMake project running on multiple platforms. There is a different starter workflow if you just want a single platform.
+# See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
+name: CMake on multiple platforms
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    timeout-minutes: 40
+
+    strategy:
+      # Ensure all matrix combos report results
+      fail-fast: false
+
+      # Matrix:
+      #  - Windows + MSVC (cl)
+      #  - Ubuntu + GCC / Clang
+      #  - macOS + Clang
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        build_type: [Release]         # Add Debug, RelWithDebInfo, etc. as needed
+        c_compiler: [gcc, clang, cl]
+        include:
+          - os: windows-latest
+            c_compiler: cl
+            cpp_compiler: cl
+          - os: ubuntu-latest
+            c_compiler: gcc
+            cpp_compiler: g++
+          - os: ubuntu-latest
+            c_compiler: clang
+            cpp_compiler: clang++
+          - os: macos-latest
+            c_compiler: clang
+            cpp_compiler: clang++
+        exclude:
+          - os: windows-latest
+            c_compiler: gcc
+          - os: windows-latest
+            c_compiler: clang
+          - os: ubuntu-latest
+            c_compiler: cl
+          - os: macos-latest
+            c_compiler: gcc
+          - os: macos-latest
+            c_compiler: cl
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set reusable strings
+        id: strings
+        shell: bash
+        run: |
+          echo "build-output-dir=${{ github.workspace }}/build/${{ matrix.os }}-${{ matrix.c_compiler }}-${{ matrix.build_type }}" >> "$GITHUB_OUTPUT"
+
+      # --- Toolchain prep per-OS ---------------------------------------------
+
+      - name: Install compilers (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          # Both GCC & Clang available; your script will pick based on CC/CXX
+          sudo apt-get install -y build-essential clang ninja-build
+
+      - name: Make build.sh executable (POSIX)
+        if: runner.os != 'Windows'
+        run: chmod +x ./build.sh
+
+      - name: Setup MSVC developer command prompt (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # Optional cache (handy if your scripts reuse the same build dir)
+      - name: Cache build tree
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.strings.outputs.build-output-dir }}
+          key: ${{ runner.os }}-cmake-${{ matrix.c_compiler }}-${{ matrix.build_type }}-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake', 'build.sh', 'build.bat') }}
+          restore-keys: |
+            ${{ runner.os }}-cmake-${{ matrix.c_compiler }}-${{ matrix.build_type }}-
+            ${{ runner.os }}-cmake-${{ matrix.c_compiler }}-
+
+      # --- Build via your scripts --------------------------------------------
+
+      - name: Build on POSIX via build.sh (CMake)
+        if: runner.os != 'Windows'
+        env:
+          # Your script can honor these:
+          BUILD_DIR: ${{ steps.strings.outputs.build-output-dir }}
+          CMAKE_BUILD_TYPE: ${{ matrix.build_type }}
+          CC: ${{ matrix.c_compiler }}
+          CXX: ${{ matrix.cpp_compiler }}
+        run: |
+          set -euxo pipefail
+          mkdir -p "$BUILD_DIR"
+          ./build.sh
+
+      - name: Build on Windows via build.bat (CMake)
+        if: runner.os == 'Windows'
+        shell: cmd
+        env:
+          BUILD_DIR: ${{ steps.strings.outputs.build-output-dir }}
+          CMAKE_BUILD_TYPE: ${{ matrix.build_type }}
+          # CC/CXX generally unused by MSVC generators, but exposed anyway
+          CC: ${{ matrix.c_compiler }}
+          CXX: ${{ matrix.cpp_compiler }}
+        run: |
+          if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
+          call build.bat
+
+      # --- Tests (run CTest if a CMake build tree exists) --------------------
+
+      - name: Test (ctest) on POSIX
+        if: runner.os != 'Windows'
+        working-directory: ${{ steps.strings.outputs.build-output-dir }}
+        run: |
+          set -euxo pipefail
+          if [ -f "CTestTestfile.cmake" ] || [ -d "Testing" ]; then
+            ctest --output-on-failure -C ${{ matrix.build_type }}
+          else
+            echo "No CTest files found in ${PWD}; skipping tests."
+          fi
+
+      - name: Test (ctest) on Windows
+        if: runner.os == 'Windows'
+        shell: cmd
+        working-directory: ${{ steps.strings.outputs.build-output-dir }}
+        run: |
+          if exist CTestTestfile.cmake (
+            ctest --output-on-failure --build-config ${{ matrix.build_type }}
+          ) else (
+            echo No CTest files found; skipping tests.
+          )
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.os }}-${{ matrix.c_compiler }}-${{ matrix.build_type }}
+          if-no-files-found: ignore
+          path: |
+            ${{ steps.strings.outputs.build-output-dir }}/**/*.log
+            ${{ steps.strings.outputs.build-output-dir }}/**/LastTest.log
+            **/CMakeFiles/CMakeOutput.log
+            **/CMakeFiles/CMakeError.log
