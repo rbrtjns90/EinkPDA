@@ -99,7 +99,7 @@ jobs:
         shell: cmd
         run: |
           cd C:\vcpkg
-          .\vcpkg install sdl2 sdl2-ttf --triplet x64-windows
+          .\vcpkg.exe install sdl2 sdl2-ttf --triplet x64-windows
 
       - name: Cache build tree
         uses: actions/cache@v4
