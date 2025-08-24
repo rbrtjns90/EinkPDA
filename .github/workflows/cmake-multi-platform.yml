@@ -1,5 +1,5 @@
-# This starter workflow is for a CMake project running on multiple platforms. There is a different starter workflow if you just want a single platform.
-# See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
+# This starter workflow is for a CMake project running on multiple platforms.
+# Uses desktop_emulator/build.sh and desktop_emulator/build.bat
 name: CMake on multiple platforms
 
 on:
@@ -23,16 +23,10 @@ jobs:
     timeout-minutes: 40
 
     strategy:
-      # Ensure all matrix combos report results
       fail-fast: false
-
-      # Matrix:
-      #  - Windows + MSVC (cl)
-      #  - Ubuntu + GCC / Clang
-      #  - macOS + Clang
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        build_type: [Release]         # Add Debug, RelWithDebInfo, etc. as needed
+        build_type: [Release]
         c_compiler: [gcc, clang, cl]
         include:
           - os: windows-latest
@@ -66,7 +60,7 @@ jobs:
         id: strings
         shell: bash
         run: |
-          echo "build-output-dir=${{ github.workspace }}/build/${{ matrix.os }}-${{ matrix.c_compiler }}-${{ matrix.build_type }}" >> "$GITHUB_OUTPUT"
+          echo "build-output-dir=${{ github.workspace }}/desktop_emulator/build/${{ matrix.os }}-${{ matrix.c_compiler }}-${{ matrix.build_type }}" >> "$GITHUB_OUTPUT"
 
       # --- Toolchain prep per-OS ---------------------------------------------
 
@@ -74,12 +68,11 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          # Both GCC & Clang available; your script will pick based on CC/CXX
           sudo apt-get install -y build-essential clang ninja-build
 
-      - name: Make build.sh executable (POSIX)
+      - name: Make build.sh executable
         if: runner.os != 'Windows'
-        run: chmod +x ./build.sh
+        run: chmod +x desktop_emulator/build.sh
 
       - name: Setup MSVC developer command prompt (Windows)
         if: runner.os == 'Windows'
@@ -87,22 +80,20 @@ jobs:
         with:
           arch: x64
 
-      # Optional cache (handy if your scripts reuse the same build dir)
       - name: Cache build tree
         uses: actions/cache@v4
         with:
           path: ${{ steps.strings.outputs.build-output-dir }}
-          key: ${{ runner.os }}-cmake-${{ matrix.c_compiler }}-${{ matrix.build_type }}-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake', 'build.sh', 'build.bat') }}
+          key: ${{ runner.os }}-cmake-${{ matrix.c_compiler }}-${{ matrix.build_type }}-${{ hashFiles('desktop_emulator/**/CMakeLists.txt', 'desktop_emulator/**/*.cmake', 'desktop_emulator/build.sh', 'desktop_emulator/build.bat') }}
           restore-keys: |
             ${{ runner.os }}-cmake-${{ matrix.c_compiler }}-${{ matrix.build_type }}-
             ${{ runner.os }}-cmake-${{ matrix.c_compiler }}-
 
-      # --- Build via your scripts --------------------------------------------
+      # --- Build via scripts --------------------------------------------
 
-      - name: Build on POSIX via build.sh (CMake)
+      - name: Build on POSIX via desktop_emulator/build.sh
         if: runner.os != 'Windows'
         env:
-          # Your script can honor these:
           BUILD_DIR: ${{ steps.strings.outputs.build-output-dir }}
           CMAKE_BUILD_TYPE: ${{ matrix.build_type }}
           CC: ${{ matrix.c_compiler }}
@@ -110,22 +101,21 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p "$BUILD_DIR"
-          ./build.sh
+          ./desktop_emulator/build.sh
 
-      - name: Build on Windows via build.bat (CMake)
+      - name: Build on Windows via desktop_emulator/build.bat
         if: runner.os == 'Windows'
         shell: cmd
         env:
           BUILD_DIR: ${{ steps.strings.outputs.build-output-dir }}
           CMAKE_BUILD_TYPE: ${{ matrix.build_type }}
-          # CC/CXX generally unused by MSVC generators, but exposed anyway
           CC: ${{ matrix.c_compiler }}
           CXX: ${{ matrix.cpp_compiler }}
         run: |
           if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
-          call build.bat
+          call desktop_emulator\build.bat
 
-      # --- Tests (run CTest if a CMake build tree exists) --------------------
+      # --- Tests (ctest if present) ------------------------------------------
 
       - name: Test (ctest) on POSIX
         if: runner.os != 'Windows'
@@ -160,3 +150,4 @@ jobs:
             ${{ steps.strings.outputs.build-output-dir }}/**/LastTest.log
             **/CMakeFiles/CMakeOutput.log
             **/CMakeFiles/CMakeError.log
+
