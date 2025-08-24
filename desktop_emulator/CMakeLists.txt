@@ -91,6 +91,10 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE DESKTOP_EMULATOR)
 if (MSVC)
   target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
 endif()
+if (WIN32)
+  # Prevent SDL from redefining main() to SDL_main on Windows
+  target_compile_definitions(${PROJECT_NAME} PRIVATE SDL_MAIN_HANDLED)
+endif()
 
 # ---------------------------
 # Link libraries
