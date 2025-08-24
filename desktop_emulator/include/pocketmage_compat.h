@@ -300,12 +300,6 @@ void updateBattState();
 void TCA8418_irq();
 void PWR_BTN_irq();
 
-// Musical note definitions
-#define NOTE_A8 4435
-#define NOTE_B8 4978
-#define NOTE_C8 4186
-#define NOTE_D8 4699
-
 // PocketMage configuration constants
 extern bool SET_CLOCK_ON_UPLOAD;
 extern bool DEBUG_VERBOSE;
