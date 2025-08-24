@@ -61,7 +61,7 @@ jobs:
         run: |
           echo "build-output-dir=${{ github.workspace }}/desktop_emulator/build/${{ matrix.os }}-${{ matrix.c_compiler }}-${{ matrix.build_type }}" >> "$GITHUB_OUTPUT"
 
-      # --- Toolchain prep per-OS ---------------------------------------------
+      # --- Toolchain & deps per-OS ---------------------------------------------
 
       - name: Install compilers (Ubuntu)
         if: runner.os == 'Linux'
@@ -93,6 +93,13 @@ jobs:
         shell: powershell
         run: |
           choco install -y pkgconfiglite
+
+      - name: Install SDL2 + SDL2_ttf (Windows via vcpkg)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          cd C:\vcpkg
+          .\vcpkg install sdl2 sdl2-ttf --triplet x64-windows
 
       - name: Cache build tree
         uses: actions/cache@v4
@@ -166,4 +173,5 @@ jobs:
             desktop_emulator/build/**/LastTest.log
             desktop_emulator/**/CMakeFiles/CMakeOutput.log
             desktop_emulator/**/CMakeFiles/CMakeError.log
+
 
