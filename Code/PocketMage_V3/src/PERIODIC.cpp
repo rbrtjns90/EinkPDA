@@ -1,9 +1,3 @@
-//  oooooooo  ooooooooo  oooooo   oooo ooooooooooo ooooooooo   ooooooooooo ooooooo  ooooo
-//  888    888 888    888 888  o  888 888         888    888  888         888   888  888  
-//  888oooo88  888oooo88  888 888 888 888ooooo    888    888  888ooooo     888    888888   
-//  888        888    888 888888888  888         888    888  888          888   888  888  
-// o888o      o888ooo888  888   o888 ooooooooooo ooooooooo  ooooooooooo  o888o o888o o888o
-
 #include "globals.h"
 #include "periodic_data.h"
 #include "periodic_data_pack.h"
@@ -299,13 +293,13 @@ static void update_oled() {
   if (selZ == 0) {
     // No element selected - show navigation help
 #ifdef DESKTOP_EMULATOR
-    oled_set_lines("Periodic Table", "Use arrows to navigate", "Enter for details");
+    oled_set_lines("Periodic Table", "Arrows: Navigate", "Enter: Details");
 #else
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_5x7_tf);
     u8g2.drawStr(0, 8, "Periodic Table");
-    u8g2.drawStr(0, 16, "Use arrows to navigate");
-    u8g2.drawStr(0, 24, "Enter for details");
+    u8g2.drawStr(0, 16, "Arrows: Navigate");
+    u8g2.drawStr(0, 24, "Enter: Details");
     u8g2.sendBuffer();
 #endif
     return;

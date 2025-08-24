@@ -28,14 +28,24 @@ void OledService::presentIfDirty() {
         return;
     }
     
+    std::string line1, line2, line3;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!state_.dirty) {
             inPresent_.store(false);
             return;
         }
+        // Copy data for rendering
+        line1 = state_.line1;
+        line2 = state_.line2;
+        line3 = state_.line3;
         // Mark as presented but keep data for getSnapshot()
         state_.dirty = false;
+    }
+    
+    // Actually render the OLED display
+    if (g_display) {
+        g_display->renderOledText(line1, line2, line3);
     }
     
     inPresent_.store(false);
