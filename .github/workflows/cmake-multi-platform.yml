@@ -87,19 +87,26 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+          
+      - name: Install vcpkg
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          git clone https://github.com/microsoft/vcpkg C:\vcpkg
+          cd C:\vcpkg
+          .\bootstrap-vcpkg.bat
+
+      - name: Install SDL2 + SDL2_ttf (Windows via vcpkg)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          C:\vcpkg\vcpkg.exe install sdl2 sdl2-ttf --triplet x64-windows
 
       - name: Install pkg-config (Windows)
         if: runner.os == 'Windows'
         shell: powershell
         run: |
           choco install -y pkgconfiglite
-
-      - name: Install SDL2 + SDL2_ttf (Windows via vcpkg)
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: |
-          cd C:\vcpkg
-          .\vcpkg.exe install sdl2 sdl2-ttf --triplet x64-windows
 
       - name: Cache build tree
         uses: actions/cache@v4
