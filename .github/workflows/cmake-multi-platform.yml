@@ -4,9 +4,10 @@ name: CMake on multiple platforms
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "rbrtjns90-patch-1" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "rbrtjns90-patch-1" ]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
