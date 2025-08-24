@@ -69,6 +69,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential clang ninja-build
 
+      - name: Install SDL2 + SDL2_ttf (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libsdl2-dev \
+            libsdl2-ttf-dev \
+            pkg-config
+
       - name: Make build.sh executable
         if: runner.os != 'Windows'
         run: chmod +x desktop_emulator/build.sh
@@ -78,6 +87,12 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+
+      - name: Install pkg-config (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          choco install -y pkgconfiglite
 
       - name: Cache build tree
         uses: actions/cache@v4
@@ -92,7 +107,7 @@ jobs:
 
       - name: Build on POSIX via desktop_emulator/build.sh
         if: runner.os != 'Windows'
-        working-directory: desktop_emulator   # 👈 run from here
+        working-directory: desktop_emulator
         env:
           BUILD_DIR: ${{ steps.strings.outputs.build-output-dir }}
           CMAKE_BUILD_TYPE: ${{ matrix.build_type }}
@@ -105,7 +120,7 @@ jobs:
 
       - name: Build on Windows via desktop_emulator/build.bat
         if: runner.os == 'Windows'
-        working-directory: desktop_emulator   # 👈 run from here
+        working-directory: desktop_emulator
         shell: cmd
         env:
           BUILD_DIR: ${{ steps.strings.outputs.build-output-dir }}
@@ -151,3 +166,4 @@ jobs:
             desktop_emulator/build/**/LastTest.log
             desktop_emulator/**/CMakeFiles/CMakeOutput.log
             desktop_emulator/**/CMakeFiles/CMakeError.log
+
