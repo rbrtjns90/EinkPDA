@@ -5,6 +5,9 @@
 // o888o      o888ooo888  888   o888 ooooooooooo ooooooooo  ooooooooooo  o888o o888o o888o
 
 #include "globals.h"
+#ifdef DESKTOP_EMULATOR
+#include "U8g2lib.h"
+#endif
 
 // Pokemon data structures
 struct Pokemon {
@@ -706,7 +709,7 @@ void drawSearchScreen() {
   display.print("Query: " + searchQuery);
   
   display.setCursor(10, 90);
-  display.print("Found: " + String(static_cast<unsigned int>(searchResults.size())) + " matches");
+  display.print("Found: " + String((int)searchResults.size()) + " matches");
   
   display.setCursor(10, display.height() - 10);
   display.print("Type to search  ⏎ View results");

@@ -6,6 +6,7 @@
 //  oo     .d8P      888      oo     .d8P      888       888       o  8    Y     888   //
 //  8""88888P'      o888o     8""88888P'      o888o     o888ooooood8 o8o        o888o  //
 #include "globals.h"
+#include <ArduinoJson.h>
 
 // High-Level File Operations
 void saveFile() {
@@ -1127,4 +1128,225 @@ void deleteFile(fs::FS &fs, const char *path) {
     noTimeout = false;
     //if (SAVE_POWER) setCpuFrequencyMhz(40);
   }
+}
+
+// ---- UTF-8 Keyboard Layout System ----
+
+// Token parser for JSON cell values
+static KeyMapping parseCellToken(const String& tok) {
+  KeyMapping km{KA_NONE, ""};
+  if (tok.length() == 0) return km;
+
+  if (tok[0] == '<' && tok[tok.length()-1] == '>') {
+    String inner = tok.substring(1, tok.length()-1);
+    inner.toLowerCase();
+
+    if      (inner == "bksp")   km.action = KA_BACKSPACE;
+    else if (inner == "tab")    km.action = KA_TAB;
+    else if (inner == "enter")  km.action = KA_ENTER;
+    else if (inner == "shift")  km.action = KA_SHIFT;
+    else if (inner == "fn")     km.action = KA_FN;
+    else if (inner == "left")   km.action = KA_LEFT;
+    else if (inner == "cycle_layout") km.action = KA_CYCLE_LAYOUT;
+    else if (inner == "right")  km.action = KA_RIGHT;
+    else if (inner == "select") km.action = KA_SELECT;
+    else if (inner == "home")   km.action = KA_HOME;
+    else if (inner == "del")    km.action = KA_DELETE;
+    else if (inner.startsWith("dead:")) {
+      km.action = KA_DEAD;
+      km.text = inner.substring(5); // the accent symbol, e.g., "´"
+    }
+    else km.action = KA_NONE;
+  } else {
+    km.action = KA_CHAR;
+    km.text = tok; // raw UTF-8 string
+  }
+  return km;
+}
+
+// Layout loader (reads /sys/kbd/<name>.json)
+bool loadKeyboardLayoutFromFile(const char* path) {
+  if (noSD) return false;
+  File f = SD_MMC.open(path, "r");
+  if (!f) return false;
+
+  // generous pool; adjust if needed
+  DynamicJsonDocument doc(32 * 1024);
+  DeserializationError err = deserializeJson(doc, f);
+  f.close();
+  if (err) return false;
+
+  KeyboardLayout L;
+  L.name = doc["name"] | "custom";
+
+  auto loadLayer = [&](const char* key, KeyMapping dest[4][10]) {
+    if (!doc["layers"].containsKey(key)) return false;
+    JsonArray layer = doc["layers"][key];
+    for (int r=0; r<4; ++r) {
+      JsonArray row = layer[r];
+      for (int c=0; c<10; ++c) {
+        dest[r][c] = parseCellToken(String(row[c].as<const char*>())); 
+      }
+    }
+    return true;
+  };
+
+  if (!loadLayer("normal", L.normal)) return false;
+  if (!loadLayer("shift",  L.shift_)) return false;
+  if (!loadLayer("fn",     L.fn))     return false;
+
+  // Dead-key table
+  DeadTable.clear();
+  if (doc["layers"].containsKey("dead")) {
+    JsonObject dead = doc["layers"]["dead"];
+    for (JsonPair kv1 : dead) {
+      String accent = String(kv1.key().c_str());
+      JsonObject bases = kv1.value().as<JsonObject>();
+      for (JsonPair kv2 : bases) {
+        DeadRule rule{accent, String(kv2.key().c_str()), String(kv2.value().as<const char*>())};
+        DeadTable.push_back(rule);
+      }
+    }
+  }
+
+  CurrentLayout = L;
+  applyLayoutToLegacyArrays();
+  return true;
+}
+
+bool selectKeyboardLayout(const String& name) {
+  String p = "/sys/kbd/" + name + ".json";
+  if (loadKeyboardLayoutFromFile(p.c_str())) {
+    CurrentLayoutName = name;
+    prefs.begin("pm", false);
+    prefs.putString("kbdLayout", name);
+    prefs.end();
+    return true;
+  }
+  return false;
+}
+
+void cycleKeyboardLayout() {
+  // Available keyboard layouts in order
+  static const String layouts[] = {"us-basic", "us-latin", "fr-azerty", "de-qwertz"};
+  static const int layoutCount = 4;
+  
+  // Find current layout index
+  int currentIndex = 0;
+  for (int i = 0; i < layoutCount; i++) {
+    if (CurrentLayoutName == layouts[i]) {
+      currentIndex = i;
+      break;
+    }
+  }
+  
+  // Cycle to next layout
+  int nextIndex = (currentIndex + 1) % layoutCount;
+  String nextLayout = layouts[nextIndex];
+  
+  if (selectKeyboardLayout(nextLayout)) {
+    oledWord("Keyboard: " + nextLayout);
+    std::cout << "[KEYBOARD] Switched to layout: " << nextLayout.c_str() << std::endl;
+  } else {
+    oledWord("Layout switch failed");
+    std::cout << "[KEYBOARD] Failed to switch to layout: " << nextLayout.c_str() << std::endl;
+  }
+}
+
+// UTF-8 utilities
+static int utf8_char_size(uint8_t lead) {
+  if ((lead & 0x80) == 0x00) return 1;
+  if ((lead & 0xE0) == 0xC0) return 2;
+  if ((lead & 0xF0) == 0xE0) return 3;
+  if ((lead & 0xF8) == 0xF0) return 4;
+  return 1;
+}
+
+int utf8_length(const String& s) {
+  int n = 0;
+  const char* p = s.c_str();
+  size_t i=0, N=s.length();
+  while (i<N) {
+    i += utf8_char_size((uint8_t)p[i]);
+    ++n;
+  }
+  return n;
+}
+
+void utf8_pop_back_inplace(String& s) {
+  int len = s.length();
+  if (len == 0) return;
+  int i = len - 1;
+  // skip continuation bytes 10xxxxxx
+  while (i > 0 && ((uint8_t)s[i] & 0xC0) == 0x80) --i;
+  s.remove(i);
+}
+
+// Dead-key composition (data-driven)
+String composeDeadIfAny(const String& base) {
+  if (CurrentDead.length() == 0) return base;
+  for (const auto& r : DeadTable) {
+    if (r.accent == CurrentDead && r.base == base) {
+      CurrentDead = "";
+      return r.out;
+    }
+  }
+  // fallback: emit accent + base
+  String out = CurrentDead + base;
+  CurrentDead = "";
+  return out;
+}
+
+// UTF-8 key reader (parallel to legacy updateKeypress())
+KeyEvent updateKeypressUTF8() {
+  KeyEvent ev{false, KA_NONE, "", 0, 0};
+
+#ifdef DESKTOP_EMULATOR
+  // Inject host text input at higher priority than the matrix
+  String host;
+  if (emulatorConsumeUTF8(host)) {
+    KeyEvent ev{true, KA_CHAR, host, 0, 0};
+    return ev;
+  }
+#endif
+
+  if (TCA8418_event == true) {
+    int k = keypad.getEvent();
+    // clear IRQ if no pending events
+    keypad.writeRegister(TCA8418_REG_INT_STAT, 1);
+    int intstat = keypad.readRegister(TCA8418_REG_INT_STAT);
+    if ((intstat & 0x01) == 0) TCA8418_event = false;
+
+    if (k & 0x80) { // pressed, not released
+      k &= 0x7F;
+      k--;
+      if ((k/10) < 4) {
+        ev.row = k/10;
+        ev.col = k%10;
+
+        KeyMapping km;
+        switch (CurrentKBState) {
+          case NORMAL: km = CurrentLayout.normal[ev.row][ev.col]; break;
+          case SHIFT:  km = CurrentLayout.shift_[ev.row][ev.col]; break;
+          case FUNC:   km = CurrentLayout.fn[ev.row][ev.col];     break;
+        }
+
+        // Toggling is handled here to emulate legacy behavior
+        if (km.action == KA_SHIFT) {
+          CurrentKBState = (CurrentKBState == SHIFT) ? NORMAL : SHIFT;
+          return ev; // no text produced
+        }
+        if (km.action == KA_FN) {
+          CurrentKBState = (CurrentKBState == FUNC) ? NORMAL : FUNC;
+          return ev;
+        }
+
+        ev.hasEvent = true;
+        ev.action = km.action;
+        ev.text = km.text;
+        return ev;
+      }
+    }
+  }
+  return ev;
 }

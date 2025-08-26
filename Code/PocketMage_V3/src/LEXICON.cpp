@@ -1,4 +1,7 @@
 #include "globals.h"
+#ifdef DESKTOP_EMULATOR
+#include "U8g2lib.h"
+#endif
 
 // Vector to hold the definitions
 std::vector<std::pair<String, String>> defList;

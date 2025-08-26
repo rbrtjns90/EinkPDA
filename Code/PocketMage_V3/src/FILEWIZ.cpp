@@ -6,6 +6,9 @@
 //   888          888   888       o  888       o      `888'    `888'       888    d888'    .P  //
 //  o888o        o888o o888ooooood8 o888ooooood8       `8'      `8'       o888o .8888888888P   //
 #include "globals.h"
+#ifdef DESKTOP_EMULATOR
+#include "U8g2lib.h"
+#endif
 
 void FILEWIZ_INIT() {
   CurrentAppState = FILEWIZ;

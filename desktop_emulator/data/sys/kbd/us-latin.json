@@ -1,0 +1,54 @@
+{
+  "name": "US Latin",
+  "description": "US QWERTY layout with Latin character support via dead keys",
+  "version": "1.0",
+  "author": "PocketMage",
+  "normal": [
+    [{"action": "CHAR", "text": "1"}, {"action": "CHAR", "text": "2"}, {"action": "CHAR", "text": "3"}, {"action": "CHAR", "text": "4"}, {"action": "CHAR", "text": "5"}, {"action": "CHAR", "text": "6"}, {"action": "CHAR", "text": "7"}, {"action": "CHAR", "text": "8"}, {"action": "CHAR", "text": "9"}, {"action": "CHAR", "text": "0"}],
+    [{"action": "CHAR", "text": "q"}, {"action": "CHAR", "text": "w"}, {"action": "CHAR", "text": "e"}, {"action": "CHAR", "text": "r"}, {"action": "CHAR", "text": "t"}, {"action": "CHAR", "text": "y"}, {"action": "CHAR", "text": "u"}, {"action": "CHAR", "text": "i"}, {"action": "CHAR", "text": "o"}, {"action": "DEAD", "text": "'"}],
+    [{"action": "CHAR", "text": "a"}, {"action": "CHAR", "text": "s"}, {"action": "CHAR", "text": "d"}, {"action": "CHAR", "text": "f"}, {"action": "CHAR", "text": "g"}, {"action": "CHAR", "text": "h"}, {"action": "CHAR", "text": "j"}, {"action": "CHAR", "text": "k"}, {"action": "CHAR", "text": "l"}, {"action": "ENTER", "text": ""}],
+    [{"action": "SHIFT", "text": ""}, {"action": "CHAR", "text": "z"}, {"action": "CHAR", "text": "x"}, {"action": "CHAR", "text": "c"}, {"action": "CHAR", "text": "v"}, {"action": "CHAR", "text": "b"}, {"action": "CHAR", "text": "n"}, {"action": "CHAR", "text": "m"}, {"action": "BACKSPACE", "text": ""}, {"action": "FN", "text": ""}]
+  ],
+  "shift": [
+    [{"action": "CHAR", "text": "!"}, {"action": "CHAR", "text": "@"}, {"action": "CHAR", "text": "#"}, {"action": "CHAR", "text": "$"}, {"action": "CHAR", "text": "%"}, {"action": "CHAR", "text": "^"}, {"action": "CHAR", "text": "&"}, {"action": "CHAR", "text": "*"}, {"action": "CHAR", "text": "("}, {"action": "CHAR", "text": ")"}],
+    [{"action": "CHAR", "text": "Q"}, {"action": "CHAR", "text": "W"}, {"action": "CHAR", "text": "E"}, {"action": "CHAR", "text": "R"}, {"action": "CHAR", "text": "T"}, {"action": "CHAR", "text": "Y"}, {"action": "CHAR", "text": "U"}, {"action": "CHAR", "text": "I"}, {"action": "CHAR", "text": "O"}, {"action": "DEAD", "text": "'"}],
+    [{"action": "CHAR", "text": "A"}, {"action": "CHAR", "text": "S"}, {"action": "CHAR", "text": "D"}, {"action": "CHAR", "text": "F"}, {"action": "CHAR", "text": "G"}, {"action": "CHAR", "text": "H"}, {"action": "CHAR", "text": "J"}, {"action": "CHAR", "text": "K"}, {"action": "CHAR", "text": "L"}, {"action": "ENTER", "text": ""}],
+    [{"action": "SHIFT", "text": ""}, {"action": "CHAR", "text": "Z"}, {"action": "CHAR", "text": "X"}, {"action": "CHAR", "text": "C"}, {"action": "CHAR", "text": "V"}, {"action": "CHAR", "text": "B"}, {"action": "CHAR", "text": "N"}, {"action": "CHAR", "text": "M"}, {"action": "BACKSPACE", "text": ""}, {"action": "FN", "text": ""}]
+  ],
+  "fn": [
+    [{"action": "CHAR", "text": "1"}, {"action": "CHAR", "text": "2"}, {"action": "CHAR", "text": "3"}, {"action": "CHAR", "text": "4"}, {"action": "CHAR", "text": "5"}, {"action": "CHAR", "text": "6"}, {"action": "CHAR", "text": "7"}, {"action": "CHAR", "text": "8"}, {"action": "CHAR", "text": "9"}, {"action": "CHAR", "text": "0"}],
+    [{"action": "CHAR", "text": "-"}, {"action": "CHAR", "text": "="}, {"action": "CHAR", "text": "["}, {"action": "CHAR", "text": "]"}, {"action": "CHAR", "text": "\\"}, {"action": "LEFT", "text": ""}, {"action": "RIGHT", "text": ""}, {"action": "UP", "text": ""}, {"action": "DOWN", "text": ""}, {"action": "DEAD", "text": "'"}],
+    [{"action": "DEAD_ACUTE", "text": "´"}, {"action": "SAVE", "text": ""}, {"action": "DEAD_GRAVE", "text": "`"}, {"action": "FILE", "text": ""}, {"action": "DEAD_CIRCUMFLEX", "text": "^"}, {"action": "HOME", "text": ""}, {"action": "CHAR", "text": ";"}, {"action": "CYCLE_LAYOUT", "text": ""}, {"action": "LOAD", "text": ""}, {"action": "ENTER", "text": ""}],
+    [{"action": "SHIFT", "text": ""}, {"action": "DEAD_TILDE", "text": "~"}, {"action": "CHAR", "text": ","}, {"action": "CLEAR", "text": ""}, {"action": "CHAR", "text": "."}, {"action": "SPACE", "text": " "}, {"action": "DEAD_DIAERESIS", "text": "¨"}, {"action": "CHAR", "text": "/"}, {"action": "BACKSPACE", "text": ""}, {"action": "FN", "text": ""}]
+  ],
+  "layers": {
+    "dead": {
+      "´": {
+        "a": "á", "e": "é", "i": "í", "o": "ó", "u": "ú", "y": "ý",
+        "A": "Á", "E": "É", "I": "Í", "O": "Ó", "U": "Ú", "Y": "Ý",
+        "c": "ć", "C": "Ć", "n": "ń", "N": "Ń", "s": "ś", "S": "Ś", "z": "ź", "Z": "Ź"
+      },
+      "`": {
+        "a": "à", "e": "è", "i": "ì", "o": "ò", "u": "ù",
+        "A": "À", "E": "È", "I": "Ì", "O": "Ò", "U": "Ù"
+      },
+      "^": {
+        "a": "â", "e": "ê", "i": "î", "o": "ô", "u": "û",
+        "A": "Â", "E": "Ê", "I": "Î", "O": "Ô", "U": "Û"
+      },
+      "~": {
+        "a": "ã", "o": "õ", "n": "ñ",
+        "A": "Ã", "O": "Õ", "N": "Ñ"
+      },
+      "¨": {
+        "a": "ä", "e": "ë", "i": "ï", "o": "ö", "u": "ü", "y": "ÿ",
+        "A": "Ä", "E": "Ë", "I": "Ï", "O": "Ö", "U": "Ü", "Y": "Ÿ"
+      },
+      "'": {
+        "a": "á", "e": "é", "i": "í", "o": "ó", "u": "ú", "y": "ý",
+        "A": "Á", "E": "É", "I": "Í", "O": "Ó", "U": "Ú", "Y": "Ý",
+        "c": "ć", "C": "Ć", "n": "ń", "N": "Ń", "s": "ś", "S": "Ś", "z": "ź", "Z": "Ź"
+      }
+    }
+  }
+}

@@ -18,7 +18,7 @@
 #include <fstream>
 #include <filesystem>
 #include <memory>
-#include "desktop_display.h"
+#include "desktop_display_sdl2.h"
 #include <string>
 #include <vector>
 #include <cstring>
@@ -31,56 +31,64 @@
 #include <cctype>
 #include <iomanip>
 
-// Forward declarations
-class String;
-class DateTime;
-class TimeSpan;
-class File;
-class TwoWire;
-class Preferences;
-class Adafruit_TCA8418;
-template<typename T, int H> class GxEPD2_BW;
-class U8G2_SH1106_128X32_VISIONOX_F_HW_I2C;
-class SD_MMCClass;
-class DesktopDisplay;
-
-// Global display instance
-extern DesktopDisplay* g_display;
-
-void listDir(SD_MMCClass& fs, const char* dirname);
-
-// Arduino basic types
-typedef uint8_t byte;
-typedef bool boolean;
-
-// Arduino String class with additional methods
+// Arduino String class implementation
 class String {
 private:
     std::string data;
 public:
-    String() = default;
+    String() {}
     String(const char* str) : data(str ? str : "") {}
     String(const std::string& str) : data(str) {}
+    String(char c) : data(1, c) {}  // Handle single character properly
     String(int value) : data(std::to_string(value)) {}
-    String(unsigned int value) : data(std::to_string(value)) {}
-    String(long value) : data(std::to_string(value)) {}
-    String(unsigned long value) : data(std::to_string(value)) {}
     String(float value) : data(std::to_string(value)) {}
     String(double value) : data(std::to_string(value)) {}
     
     const char* c_str() const { return data.c_str(); }
     size_t length() const { return data.length(); }
+    char operator[](size_t index) const { return data[index]; }
+    char& operator[](size_t index) { return data[index]; }
+    
+    String operator+(const String& other) const { return String(data + other.data); }
+    String operator+(const char* str) const { return String(data + (str ? str : "")); }
+    String& operator+=(const String& other) { data += other.data; return *this; }
+    String& operator+=(const char* str) { if(str) data += str; return *this; }
+    String& operator+=(char c) { data += c; return *this; }
+    
     bool operator==(const String& other) const { return data == other.data; }
     bool operator!=(const String& other) const { return data != other.data; }
-    String operator+(const String& other) const { return String(data + other.data); }
-    String& operator+=(const String& other) { data += other.data; return *this; }
-    String& operator+=(const char* str) { if (str) data += str; return *this; }
-    String& operator+=(char c) { data += c; return *this; }
-    char operator[](size_t index) const { return index < data.size() ? data[index] : '\0'; }
-    void remove(size_t index) { if (index < data.size()) data.erase(index, 1); }
+    
     String substring(size_t start, size_t end = std::string::npos) const {
         if (end == std::string::npos) return String(data.substr(start));
         return String(data.substr(start, end - start));
+    }
+    
+    int indexOf(char c, size_t start = 0) const {
+        size_t pos = data.find(c, start);
+        return (pos == std::string::npos) ? -1 : (int)pos;
+    }
+    
+    int indexOf(const String& str, size_t start = 0) const {
+        size_t pos = data.find(str.data, start);
+        return (pos == std::string::npos) ? -1 : (int)pos;
+    }
+    
+    void replace(const String& from, const String& to) {
+        size_t pos = 0;
+        while ((pos = data.find(from.data, pos)) != std::string::npos) {
+            data.replace(pos, from.data.length(), to.data);
+            pos += to.data.length();
+        }
+    }
+    
+    String& trim() {
+        data.erase(data.begin(), std::find_if(data.begin(), data.end(), [](unsigned char ch) {
+            return !std::isspace(ch);
+        }));
+        data.erase(std::find_if(data.rbegin(), data.rend(), [](unsigned char ch) {
+            return !std::isspace(ch);
+        }).base(), data.end());
+        return *this;
     }
     
     // Additional methods needed by PocketMage
@@ -94,26 +102,15 @@ public:
         return pos == std::string::npos ? -1 : static_cast<int>(pos);
     }
     
-    int lastIndexOf(const String& str) const {
-        size_t pos = data.find_last_of(str.data);
-        return pos == std::string::npos ? -1 : static_cast<int>(pos);
-    }
-    
     bool startsWith(const String& prefix) const {
         if (prefix.length() > data.length()) return false;
         return data.compare(0, prefix.length(), prefix.data) == 0;
     }
     
-    bool isEmpty() const {
-        return data.empty();
-    }
-    
+    bool isEmpty() const { return data.empty(); }
     int toInt() const {
-        try {
-            return std::stoi(data);
-        } catch (...) {
-            return 0;
-        }
+        try { return std::stoi(data); }
+        catch (...) { return 0; }
     }
     
     void toLowerCase() {
@@ -124,56 +121,30 @@ public:
         std::transform(data.begin(), data.end(), data.begin(), ::toupper);
     }
     
-    int indexOf(char c) const {
-        size_t pos = data.find(c);
-        return pos != std::string::npos ? static_cast<int>(pos) : -1;
-    }
-    
-    int indexOf(char c, size_t start) const {
-        size_t pos = data.find(c, start);
-        return pos != std::string::npos ? static_cast<int>(pos) : -1;
-    }
-    
-    int indexOf(const String& str) const {
-        size_t pos = data.find(str.data);
-        return pos != std::string::npos ? static_cast<int>(pos) : -1;
-    }
-    
-    bool operator<(const String& other) const {
-        return data < other.data;
-    }
-    
-    bool operator>(const String& other) const {
-        return data > other.data;
-    }
-    
-    bool operator<=(const String& other) const {
-        return data <= other.data;
-    }
-    
-    bool operator>=(const String& other) const {
-        return data >= other.data;
-    }
+    bool operator<(const String& other) const { return data < other.data; }
+    bool operator>(const String& other) const { return data > other.data; }
+    bool operator<=(const String& other) const { return data <= other.data; }
+    bool operator>=(const String& other) const { return data >= other.data; }
     
     char charAt(size_t index) const {
         return index < data.size() ? data[index] : '\0';
     }
     
-    bool equals(const String& other) const {
-        return data == other.data;
-    }
-    
-    void trim() {
-        // Remove leading whitespace
-        data.erase(data.begin(), std::find_if(data.begin(), data.end(), [](unsigned char ch) {
-            return !std::isspace(ch);
-        }));
-        // Remove trailing whitespace
-        data.erase(std::find_if(data.rbegin(), data.rend(), [](unsigned char ch) {
-            return !std::isspace(ch);
-        }).base(), data.end());
-    }
+    bool equals(const String& other) const { return data == other.data; }
+    void remove(size_t index) { if (index < data.size()) data.erase(index, 1); }
 };
+class DateTime;
+class TimeSpan;
+class File;
+class TwoWire;
+class Preferences;
+class Adafruit_TCA8418;
+class U8G2_SH1106_128X32_VISIONOX_F_HW_I2C;
+class SD_MMCClass;
+template<typename T, int H> class GxEPD2_BW;
+typedef bool boolean;
+
+// Duplicate String class removed - using the one defined above
 
 // Allow streaming our Arduino-like String to iostreams
 inline std::ostream& operator<<(std::ostream& os, const String& s) {
@@ -300,11 +271,6 @@ void updateBattState();
 void TCA8418_irq();
 void PWR_BTN_irq();
 
-// Musical note definitions
-#define NOTE_A8 4435
-#define NOTE_B8 4978
-#define NOTE_C8 4186
-#define NOTE_D8 4699
 
 // PocketMage configuration constants
 extern bool SET_CLOCK_ON_UPLOAD;

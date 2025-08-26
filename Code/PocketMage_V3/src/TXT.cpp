@@ -6,6 +6,9 @@
 //       888        d8'  `888b        888       //
 //      o888o     o888o  o88888o     o888o      //
 #include "globals.h"
+#ifdef DESKTOP_EMULATOR
+#include "U8g2lib.h"
+#endif
 
 void TXT_INIT() {
   std::cout << "[POCKETMAGE] TXT_INIT() starting..." << std::endl;
@@ -485,6 +488,9 @@ void einkHandler_TXT() {
         display.hibernate();
         CurrentKBState = NORMAL;
         break;
+      case FONT:
+        // Font selection state - handled by processKB_TXT_NEW
+        break;
     }
   }
 }
@@ -500,7 +506,8 @@ void processKB_TXT_NEW() {
 
   int currentMillis = millis();
   if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
-    char inchar = updateKeypress();
+    KeyEvent keyEvent = updateKeypressUTF8();
+    bool hasInput = keyEvent.hasEvent;
     switch (CurrentTXTState) {
       case TXT_:
         // SET MAXIMUMS AND FONT
@@ -510,40 +517,31 @@ void processKB_TXT_NEW() {
         updateScrollFromTouch();
 
         // HANDLE INPUTS
-        //No char recieved
-        if (inchar == 0);  
-        else if (inchar == 12 || inchar == 27) {
+        //No input received
+        if (!hasInput);  
+        else if (keyEvent.action == KA_ESC || keyEvent.action == KA_HOME) {
           CurrentAppState = HOME;
           currentLine     = "";
           newState        = true;
           CurrentKBState  = NORMAL;
         }
-        //TAB Recieved
-        else if (inchar == 9) {                                  
+        //TAB Received
+        else if (keyEvent.action == KA_TAB) {                                  
           currentLine += "    ";
-        }                                      
-        //SHIFT Recieved
-        else if (inchar == 17) {                                  
-          if (CurrentKBState == SHIFT) CurrentKBState = NORMAL;
-          else CurrentKBState = SHIFT;
         }
-        //FN Recieved
-        else if (inchar == 18) {                                  
-          if (CurrentKBState == FUNC) CurrentKBState = NORMAL;
-          else CurrentKBState = FUNC;
-        }
-        //Space Recieved
-        else if (inchar == 32) {                                  
+        //SHIFT and FN are handled automatically by updateKeypressUTF8()
+        //Space Received
+        else if (keyEvent.action == KA_SPACE) {                                  
           currentLine += " ";
         }
-        //CR Recieved
-        else if (inchar == 13) {                          
+        //CR Received
+        else if (keyEvent.action == KA_ENTER) {                          
           allLines.push_back(currentLine);
           currentLine = "";
           newLineAdded = true;
         }
-        //ESC / CLEAR Recieved
-        else if (inchar == 20) {                                  
+        //ESC / CLEAR Received
+        else if (keyEvent.action == KA_CLEAR) {                                  
           allLines.clear();
           currentLine = "";
           oledWord("Clearing...");
@@ -552,21 +550,22 @@ void processKB_TXT_NEW() {
           delay(300);
         }
         // LEFT
-        else if (inchar == 19) {                                  
+        else if (keyEvent.action == KA_LEFT) {                                  
           
         }
         // RIGHT
-        else if (inchar == 21) {                                  
+        else if (keyEvent.action == KA_RIGHT) {                                  
           
         }
-        //BKSP Recieved
-        else if (inchar == 8) {                  
+        //BKSP Received
+        else if (keyEvent.action == KA_BACKSPACE) {                  
           if (currentLine.length() > 0) {
-            currentLine.remove(currentLine.length() - 1);
+            // UTF-8 safe backspace
+            currentLine = utf8SafeBackspace(currentLine);
           }
         }
-        //SAVE Recieved
-        else if (inchar == 6) {
+        //SAVE Received
+        else if (keyEvent.action == KA_SAVE) {
           //File exists, save normally
           if (editingFile != "" && editingFile != "-") {
             saveFile();
@@ -582,28 +581,51 @@ void processKB_TXT_NEW() {
             newState = true;
           }
         }
-        //LOAD Recieved
-        else if (inchar == 5) {
+        //LOAD Received
+        else if (keyEvent.action == KA_LOAD) {
           loadFile();
           CurrentKBState = NORMAL;
           newLineAdded = true;
         }
-        //FILE Recieved
-        else if (inchar == 7) {
+        //FILE Received
+        else if (keyEvent.action == KA_FILE) {
           CurrentTXTState = WIZ0;
           CurrentKBState = NORMAL;
           newState = true;
         }
         // Font Switcher 
-        else if (inchar == 14) {                                  
+        else if (keyEvent.action == KA_FONT) {                                  
           CurrentTXTState = FONT;
           CurrentKBState = FUNC;
           newState = true;
         }
-        else {
-          currentLine += inchar;
-          if (inchar >= 48 && inchar <= 57) {}  //Only leave FN on if typing numbers
-          else if (CurrentKBState != NORMAL) {
+        // Cycle keyboard layout (Fn+K)
+        else if (keyEvent.action == KA_CYCLE_LAYOUT) {
+          cycleKeyboardLayout();
+        }
+        // Handle dead key input
+        else if (keyEvent.action == KA_DEAD && keyEvent.text.length() > 0) {
+          CurrentDead = keyEvent.text;
+          std::cout << "[TXT] Dead key activated: '" << keyEvent.text.c_str() << "'" << std::endl;
+        }
+        // Handle UTF-8 character input
+        else if (keyEvent.action == KA_CHAR && keyEvent.text.length() > 0) {
+          String composedText = composeDeadIfAny(keyEvent.text);
+          currentLine += composedText;
+          // Reset modifier states after character input (except for numbers in FN mode)
+          if (CurrentKBState == FUNC) {
+            // Check if the input contains digits to keep FN mode active
+            bool hasDigit = false;
+            for (int i = 0; i < keyEvent.text.length(); i++) {
+              if (keyEvent.text[i] >= '0' && keyEvent.text[i] <= '9') {
+                hasDigit = true;
+                break;
+              }
+            }
+            if (!hasDigit && CurrentKBState != NORMAL) {
+              CurrentKBState = NORMAL;
+            }
+          } else if (CurrentKBState != NORMAL) {
             CurrentKBState = NORMAL;
           }
         }
@@ -654,10 +676,10 @@ void processKB_TXT_NEW() {
 
         break;
       case WIZ0:
-        //No char recieved
-        if (inchar == 0);
-        //BKSP Recieved
-        else if (inchar == 127 || inchar == 8) {                  
+        //No input received
+        if (!hasInput);
+        //BKSP Received
+        else if (keyEvent.action == KA_BACKSPACE) {                  
           CurrentTXTState = TXT_;
           CurrentKBState = NORMAL;
           newLineAdded = true;
@@ -665,8 +687,8 @@ void processKB_TXT_NEW() {
           currentLine = "";
           display.fillScreen(GxEPD_WHITE);
         }
-        else if (inchar >= '0' && inchar <= '9'){
-          int fileIndex = (inchar == '0') ? 10 : (inchar - '0');
+        else if (keyEvent.action == KA_CHAR && keyEvent.text.length() == 1 && keyEvent.text[0] >= '0' && keyEvent.text[0] <= '9'){
+          int fileIndex = (keyEvent.text[0] == '0') ? 10 : (keyEvent.text[0] - '0');
           //Edit a new file
           if (filesList[fileIndex - 1] != editingFile) {
             //Selected file does not exist, create a new one
@@ -706,18 +728,18 @@ void processKB_TXT_NEW() {
         }
         break;
       case WIZ1:
-        //No char recieved
-        if (inchar == 0);
-        //BKSP Recieved
-        else if (inchar == 127 || inchar == 8) {                  
+        //No input received
+        if (!hasInput);
+        //BKSP Received
+        else if (keyEvent.action == KA_BACKSPACE) {                  
           CurrentTXTState = WIZ0;
           CurrentKBState = FUNC;
           einkRefresh = FULL_REFRESH_AFTER + 1;
           newState = true;
           display.fillScreen(GxEPD_WHITE);
         }
-        else if (inchar >= '0' && inchar <= '9'){
-          int numSelect = (inchar == '0') ? 10 : (inchar - '0');
+        else if (keyEvent.action == KA_CHAR && keyEvent.text.length() == 1 && keyEvent.text[0] >= '0' && keyEvent.text[0] <= '9'){
+          int numSelect = (keyEvent.text[0] == '0') ? 10 : (keyEvent.text[0] - '0');
           //YES (save current file)
           if (numSelect == 1) {
             Serial.println("YES (save current file)");
@@ -771,34 +793,23 @@ void processKB_TXT_NEW() {
         break;
 
       case WIZ2:
-        //No char recieved
-        if (inchar == 0);                                         
-        //SHIFT Recieved
-        else if (inchar == 17) {                                  
-          if (CurrentKBState == SHIFT) CurrentKBState = NORMAL;
-          else CurrentKBState = SHIFT;
-          newState = true;
-        }
-        //FN Recieved
-        else if (inchar == 18) {                                  
-          if (CurrentKBState == FUNC) CurrentKBState = NORMAL;
-          else CurrentKBState = FUNC;
-          newState = true;
-        }
-        //Space Recieved
-        else if (inchar == 32) {}
-        //ESC / CLEAR Recieved
-        else if (inchar == 20) {                                  
+        //No input received
+        if (!hasInput);                                         
+        //SHIFT and FN are handled automatically by updateKeypressUTF8()
+        //Space Received (ignored in filename entry)
+        else if (keyEvent.action == KA_SPACE) {}
+        //ESC / CLEAR Received
+        else if (keyEvent.action == KA_CLEAR) {                                  
           currentWord = "";
         }
-        //BKSP Recieved
-        else if (inchar == 8) {                  
+        //BKSP Received
+        else if (keyEvent.action == KA_BACKSPACE) {                  
           if (currentWord.length() > 0) {
-            currentWord.remove(currentWord.length() - 1);
+            currentWord = utf8SafeBackspace(currentWord);
           }
         }
-        //ENTER Recieved
-        else if (inchar == 13) {                          
+        //ENTER Received
+        else if (keyEvent.action == KA_ENTER) {                          
           prevEditingFile = "/" + currentWord + ".txt";
 
           //Save the file
@@ -817,13 +828,14 @@ void processKB_TXT_NEW() {
           currentWord = "";
           currentLine = "";
         }
-        //All other chars
-        else {
-          //Only allow char to be added if it's an allowed char
-          if (isalnum(inchar) || inchar == '_' || inchar == '-' || inchar == '.') currentWord += inchar;
-          if (inchar >= 48 && inchar <= 57) {}  //Only leave FN on if typing numbers
-          else if (CurrentKBState != NORMAL){
-            CurrentKBState = NORMAL;
+        //Handle character input for filename
+        else if (keyEvent.action == KA_CHAR && keyEvent.text.length() > 0) {
+          //Only allow ASCII chars for filenames (UTF-8 filenames can be problematic)
+          if (keyEvent.text.length() == 1) {
+            char c = keyEvent.text[0];
+            if (isalnum(c) || c == '_' || c == '-' || c == '.') {
+              currentWord += c;
+            }
           }
         }
 
@@ -835,32 +847,23 @@ void processKB_TXT_NEW() {
         }
         break;
       case WIZ3:
-        //No char recieved
-        if (inchar == 0);                                         
-        //SHIFT Recieved
-        else if (inchar == 17) {                                  
-          if (CurrentKBState == SHIFT) CurrentKBState = NORMAL;
-          else CurrentKBState = SHIFT;
-        }
-        //FN Recieved
-        else if (inchar == 18) {                                  
-          if (CurrentKBState == FUNC) CurrentKBState = NORMAL;
-          else CurrentKBState = FUNC;
-        }
-        //Space Recieved
-        else if (inchar == 32) {}
-        //ESC / CLEAR Recieved
-        else if (inchar == 20) {                                  
+        //No input received
+        if (!hasInput);                                         
+        //SHIFT and FN are handled automatically by updateKeypressUTF8()
+        //Space Received (ignored in filename entry)
+        else if (keyEvent.action == KA_SPACE) {}
+        //ESC / CLEAR Received
+        else if (keyEvent.action == KA_CLEAR) {                                  
           currentWord = "";
         }
-        //BKSP Recieved
-        else if (inchar == 8) {                  
+        //BKSP Received
+        else if (keyEvent.action == KA_BACKSPACE) {                  
           if (currentWord.length() > 0) {
-            currentWord.remove(currentWord.length() - 1);
+            currentWord = utf8SafeBackspace(currentWord);
           }
         }
-        //ENTER Recieved
-        else if (inchar == 13) {                          
+        //ENTER Received
+        else if (keyEvent.action == KA_ENTER) {                          
           editingFile = "/" + currentWord + ".txt";
 
           //Save the file
@@ -874,13 +877,14 @@ void processKB_TXT_NEW() {
           currentWord = "";
           currentLine = "";
         }
-        //All other chars
-        else {
-          //Only allow char to be added if it's an allowed char
-          if (isalnum(inchar) || inchar == '_' || inchar == '-' || inchar == '.') currentWord += inchar;
-          if (inchar >= 48 && inchar <= 57) {}  //Only leave FN on if typing numbers
-          else if (CurrentKBState != NORMAL){
-            CurrentKBState = NORMAL;
+        //Handle character input for filename
+        else if (keyEvent.action == KA_CHAR && keyEvent.text.length() > 0) {
+          //Only allow ASCII chars for filenames (UTF-8 filenames can be problematic)
+          if (keyEvent.text.length() == 1) {
+            char c = keyEvent.text[0];
+            if (isalnum(c) || c == '_' || c == '-' || c == '.') {
+              currentWord += c;
+            }
           }
         }
 
@@ -892,10 +896,10 @@ void processKB_TXT_NEW() {
         }
         break;
       case FONT:
-        //No char recieved
-        if (inchar == 0);
-        //BKSP Recieved
-        else if (inchar == 127 || inchar == 8) {                  
+        //No input received
+        if (!hasInput);
+        //BKSP Received
+        else if (keyEvent.action == KA_BACKSPACE) {                  
           CurrentTXTState = TXT_;
           CurrentKBState = NORMAL;
           newLineAdded = true;
@@ -903,8 +907,8 @@ void processKB_TXT_NEW() {
           currentLine = "";
           display.fillScreen(GxEPD_WHITE);
         }
-        else if (inchar >= '0' && inchar <= '9') {
-          int fontIndex = (inchar == '0') ? 10 : (inchar - '0');
+        else if (keyEvent.action == KA_CHAR && keyEvent.text.length() == 1 && keyEvent.text[0] >= '0' && keyEvent.text[0] <= '9') {
+          int fontIndex = (keyEvent.text[0] == '0') ? 10 : (keyEvent.text[0] - '0');
           switch (fontIndex) {
             case 1:
               currentFont = &FreeMonoBold9pt7b;

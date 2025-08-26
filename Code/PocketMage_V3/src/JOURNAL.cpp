@@ -1,4 +1,7 @@
 #include "globals.h"
+#ifdef DESKTOP_EMULATOR
+#include "U8g2lib.h"
+#endif
 
 String currentJournal = "";
 String bufferEditingFile = editingFile;

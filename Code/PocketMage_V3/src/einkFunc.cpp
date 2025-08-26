@@ -6,6 +6,10 @@
 //   888       o          888   8       `888   888  `88b.   //
 //  o888ooooood8         o888o o8o        `8  o888o  o888o  //
 #include "globals.h"
+#include <U8g2_for_Adafruit_GFX.h>
+
+// UTF-8 rendering wrapper
+U8G2_FOR_ADAFRUIT_GFX u8g2Gfx;
 
 void refresh() {
   // USE A SLOW FULL UPDATE EVERY N FAST UPDATES OR WHEN SPECIFIED
@@ -123,6 +127,10 @@ void setTXTFont(const GFXfont* font) {
   // SET THE FONT
   display.setFont(font);
   currentFont = (GFXfont*)font;
+  
+  // Initialize UTF-8 wrapper with the display and font
+  u8g2Gfx.begin(display);
+  u8g2Gfx.setFont(u8g2_font_unifont_t_latin);  // UTF-8 compatible font
 
   // UPDATE maxCharsPerLine & maxLines
   maxCharsPerLine = getMaxCharsPerLine();
@@ -141,6 +149,29 @@ void drawThickLine(int x0, int y0, int x1, int y1, int thickness) {
     int cy = round(y0 + i * stepY);
     display.fillCircle(cx, cy, thickness / 2, GxEPD_BLACK);
   }
+}
+
+// UTF-8 aware text rendering functions
+void printUTF8(int16_t x, int16_t y, const String& text) {
+  u8g2Gfx.setCursor(x, y);
+  u8g2Gfx.print(text);
+}
+
+void printUTF8(const String& text) {
+  u8g2Gfx.print(text);
+}
+
+void setCursorUTF8(int16_t x, int16_t y) {
+  u8g2Gfx.setCursor(x, y);
+}
+
+// Get UTF-8 text bounds (approximate, since U8g2 doesn't provide exact bounds)
+void getTextBoundsUTF8(const String& text, int16_t x, int16_t y, int16_t* x1, int16_t* y1, uint16_t* w, uint16_t* h) {
+  // Use U8g2 string width function for more accurate UTF-8 measurements
+  *w = u8g2Gfx.getUTF8Width(text.c_str());
+  *h = u8g2Gfx.getFontAscent() - u8g2Gfx.getFontDescent();
+  *x1 = x;
+  *y1 = y - u8g2Gfx.getFontAscent();
 }
 
 void einkTextPartial(String text, bool noRefresh) {
@@ -210,16 +241,16 @@ void einkTextDynamic(bool doFull_, bool noRefresh) {
     if (size == 0 || allText.length() == 0) {
       std::cout << "[POCKETMAGE] No content - drawing cursor/placeholder" << std::endl;
       display.setFullWindow();
-      display.setCursor(0, fontHeight);
-      display.print("_");  // Show cursor
+      setCursorUTF8(0, fontHeight);
+      printUTF8("_");  // Show cursor
     } else {
       std::cout << "[POCKETMAGE] Drawing " << size << " lines of text" << std::endl;
       for (uint8_t i = size - displayLines - scrollOffset; i < size - scrollOffset; i++) {
         if ((allLines[i]).length() > 0) {
           display.setFullWindow();
           //display.fillRect(0, (fontHeight + lineSpacing) * (i - (size - displayLines - scrollOffset)), display.width(), (fontHeight + lineSpacing), GxEPD_WHITE);
-          display.setCursor(0, fontHeight + ((fontHeight + lineSpacing) * (i - (size - displayLines - scrollOffset))));
-          display.print(allLines[i]);
+          setCursorUTF8(0, fontHeight + ((fontHeight + lineSpacing) * (i - (size - displayLines - scrollOffset))));
+          printUTF8(allLines[i]);
           std::cout << "[POCKETMAGE] Drew line " << i << ": '" << allLines[i].c_str() << "'" << std::endl;
           Serial.println(allLines[i]);
         }
@@ -231,8 +262,8 @@ void einkTextDynamic(bool doFull_, bool noRefresh) {
     if ((allLines[size - displayLines - scrollOffset]).length() > 0) {
       display.setPartialWindow(0, (fontHeight + lineSpacing) * (size - displayLines - scrollOffset), display.width(), (fontHeight + lineSpacing));
       display.fillRect(0, (fontHeight + lineSpacing) * (size - displayLines - scrollOffset), display.width(), (fontHeight + lineSpacing), GxEPD_WHITE);
-      display.setCursor(0, fontHeight + ((fontHeight + lineSpacing) * (size - displayLines - scrollOffset)));
-      display.print(allLines[size - displayLines - scrollOffset]);
+      setCursorUTF8(0, fontHeight + ((fontHeight + lineSpacing) * (size - displayLines - scrollOffset)));
+      printUTF8(allLines[size - displayLines - scrollOffset]);
     }
   }
 

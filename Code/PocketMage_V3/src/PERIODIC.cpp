@@ -5,6 +5,9 @@
 // o888o      o888ooo888  888   o888 ooooooooooo ooooooooo  ooooooooooo  o888o o888o o888o
 
 #include "globals.h"
+#ifdef DESKTOP_EMULATOR
+#include "U8g2lib.h"
+#endif
 #include "periodic_data.h"
 #include "periodic_data_pack.h"
 

@@ -50,6 +50,10 @@ public:
     char getLastKey();
     bool isKeyPressed(SDL_Scancode key);
     
+    // UTF-8 text input handling
+    bool hasUTF8Input();
+    std::string getUTF8Input();
+    
     // Utility
     void present();
     void renderOledText(const std::string& line1, const std::string& line2, const std::string& line3);
@@ -71,6 +75,10 @@ private:
     // Input state
     char lastKey;
     bool keyPressed[SDL_NUM_SCANCODES];
+    
+    // UTF-8 text input state
+    std::string utf8InputBuffer;
+    bool hasUTF8InputData;
     
     void updateEinkTexture();
     void updateOledTexture();

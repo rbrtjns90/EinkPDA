@@ -6,6 +6,9 @@
 #include <cstdlib>
 #include <string>
 
+// Forward declaration
+bool loadKeyboardLayout(const String& layoutName);
+
 // Include globals to access AppState enum
 enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
 
@@ -75,6 +78,10 @@ void emulatorSetup() {
     // Give setup time to initialize
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
     std::cout << "PocketMage setup() started" << std::endl;
+    
+    // Initialize keyboard layout and dead keys
+    std::cout << "Loading keyboard layout..." << std::endl;
+    loadKeyboardLayout("us-latin");
     
     // Force initial drawing to populate the framebuffers
     std::cout << "Drawing initial HOME screen..." << std::endl;

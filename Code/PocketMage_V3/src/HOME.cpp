@@ -6,6 +6,9 @@
 //   888     888  `88b    d88'  8    Y     888   888       o  //
 //  o888o   o888o  `Y8bood8P'  o8o        o888o o888ooooood8  //
 #include "globals.h"
+#ifdef DESKTOP_EMULATOR
+#include "U8g2lib.h"
+#endif
 
 // Forward declarations
 void PERIODIC_INIT();
@@ -173,55 +176,72 @@ void processKB_HOME() {
   switch (CurrentHOMEState) {
     case HOME_HOME:
       if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
-        char inchar = updateKeypress();
-        if (inchar != 0) {
-          std::cout << "[POCKETMAGE] processKB_HOME received: '" << inchar << "' (ASCII " << (int)inchar << ")" << std::endl;
+        KeyEvent keyEvent = updateKeypressUTF8();
+        bool hasInput = keyEvent.hasEvent;
+        
+        if (hasInput) {
+          std::cout << "[POCKETMAGE] processKB_HOME received UTF-8 input: action=" << keyEvent.action << " text='" << keyEvent.text.c_str() << "'" << std::endl;
         }
+        
         // HANDLE INPUTS
-        //No char recieved
-        if (inchar == 0);   
-        //CR Recieved
-        else if (inchar == 13) {                          
+        //No input received
+        if (!hasInput);   
+        //CR Received
+        else if (keyEvent.action == KA_ENTER) {                          
           std::cout << "[POCKETMAGE] Enter pressed! Executing command: '" << currentLine.c_str() << "'" << std::endl;
           commandSelect(currentLine);
           currentLine = "";
         }                                      
-        //SHIFT Recieved
-        else if (inchar == 17) {                                  
-          if (CurrentKBState == SHIFT) CurrentKBState = NORMAL;
-          else CurrentKBState = SHIFT;
-        }
-        //FN Recieved
-        else if (inchar == 18) {                                  
-          if (CurrentKBState == FUNC) CurrentKBState = NORMAL;
-          else CurrentKBState = FUNC;
-        }
-        //Space Recieved
-        else if (inchar == 32) {                                  
+        //SHIFT and FN are handled automatically by updateKeypressUTF8()
+        //Space Received
+        else if (keyEvent.action == KA_SPACE) {                                  
           currentLine += " ";
         }
-        // Home recieved
-        else if (inchar == 12 || inchar == 27) {
+        // Home/ESC received
+        else if (keyEvent.action == KA_HOME || keyEvent.action == KA_ESC) {
           CurrentAppState = HOME;
           currentLine     = "";
           newState        = true;
           CurrentKBState  = NORMAL;
         }
-        //ESC / CLEAR Recieved
-        else if (inchar == 20) {                                  
+        //CLEAR Received
+        else if (keyEvent.action == KA_CLEAR) {                                  
           currentLine = "";
         }
-        //BKSP Recieved
-        else if (inchar == 8) {                  
+        //BKSP Received
+        else if (keyEvent.action == KA_BACKSPACE) {                  
           if (currentLine.length() > 0) {
-            currentLine.remove(currentLine.length() - 1);
+            currentLine = utf8SafeBackspace(currentLine);
           }
         }
-        else {
-          currentLine += inchar;
-          std::cout << "[POCKETMAGE] Added char to command: '" << inchar << "', currentLine now: '" << currentLine.c_str() << "'" << std::endl;
-          if (inchar >= 48 && inchar <= 57) {}  //Only leave FN on if typing numbers
-          else if (CurrentKBState != NORMAL) {
+        // Cycle keyboard layout (Fn+K)
+        else if (keyEvent.action == KA_CYCLE_LAYOUT) {
+          cycleKeyboardLayout();
+        }
+        // Handle dead key input
+        else if (keyEvent.action == KA_DEAD && keyEvent.text.length() > 0) {
+          CurrentDead = keyEvent.text;
+          std::cout << "[POCKETMAGE] Dead key activated: '" << keyEvent.text.c_str() << "'" << std::endl;
+        }
+        // Handle UTF-8 character input
+        else if (keyEvent.action == KA_CHAR && keyEvent.text.length() > 0) {
+          String composedText = composeDeadIfAny(keyEvent.text);
+          currentLine += composedText;
+          std::cout << "[POCKETMAGE] Added UTF-8 text to command: '" << composedText.c_str() << "', currentLine now: '" << currentLine.c_str() << "'" << std::endl;
+          // Reset modifier states after character input (except for numbers in FN mode)
+          if (CurrentKBState == FUNC) {
+            // Check if the input contains digits to keep FN mode active
+            bool hasDigit = false;
+            for (int i = 0; i < keyEvent.text.length(); i++) {
+              if (keyEvent.text[i] >= '0' && keyEvent.text[i] <= '9') {
+                hasDigit = true;
+                break;
+              }
+            }
+            if (!hasDigit && CurrentKBState != NORMAL) {
+              CurrentKBState = NORMAL;
+            }
+          } else if (CurrentKBState != NORMAL) {
             CurrentKBState = NORMAL;
           }
         }

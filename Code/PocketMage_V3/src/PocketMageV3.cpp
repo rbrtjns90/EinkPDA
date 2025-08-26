@@ -2,6 +2,9 @@
 // @Ashtf 2025
 
 #include "globals.h"
+#ifdef DESKTOP_EMULATOR
+#include "U8g2lib.h"
+#endif
 
 // Forward declarations
 void drawPERIODIC();
@@ -203,6 +206,16 @@ void setup() {
   if (!SD_MMC.exists("/sys/SDMMC_META.txt")) {
     File f = SD_MMC.open("/sys/SDMMC_META.txt", FILE_WRITE);
     if (f) f.close();
+  }
+
+  // KEYBOARD LAYOUT SETUP
+  if (!SD_MMC.exists("/sys/kbd")) SD_MMC.mkdir("/sys/kbd");
+  
+  // Load default keyboard layout
+  if (!loadKeyboardLayout("/sys/kbd/us-basic.json")) {
+    Serial.println("Failed to load keyboard layout, using fallback");
+    // Initialize with basic fallback layout if JSON loading fails
+    initializeFallbackLayout();
   }
  
   loadState();

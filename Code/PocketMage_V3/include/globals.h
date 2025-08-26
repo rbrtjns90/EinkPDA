@@ -4,8 +4,10 @@
 // LIBRARIES
 #include <Arduino.h>
 #include <GxEPD2_BW.h>
-#include <U8g2lib.h>
-#include <Wire.h>
+#include "Arduino.h"
+#include "Wire.h"
+#include "SPI.h"
+#include <map>
 #include <Adafruit_TCA8418.h>
 #include <vector>
 #include <algorithm>
@@ -114,6 +116,76 @@ extern volatile bool SDActive;
 enum KBState { NORMAL, SHIFT, FUNC };
 extern KBState CurrentKBState;
 
+// ---- Keyboard (UTF-8 aware) ----
+enum KeyAction : uint8_t {
+  KA_NONE = 0,
+  KA_CHAR,       // text contains UTF-8 character(s)
+  KA_DEAD,       // text contains the accent/dead key symbol (e.g., "´")
+  KA_BACKSPACE,  // delete previous codepoint
+  KA_TAB,
+  KA_ENTER,
+  KA_SHIFT,      // toggle shift layer
+  KA_FN,         // toggle fn layer
+  KA_LEFT,
+  KA_RIGHT,
+  KA_SELECT,
+  KA_HOME,
+  KA_DELETE,
+  KA_SPACE,
+  KA_CLEAR,
+  KA_FONT,
+  // Dead key actions
+  KA_DEAD_ACUTE,
+  KA_DEAD_GRAVE,
+  KA_DEAD_CIRCUMFLEX,
+  KA_DEAD_TILDE,
+  KA_DEAD_DIAERESIS,
+  // App actions
+  KA_SAVE,
+  KA_LOAD,
+  KA_FILE,
+  KA_ESC,
+  KA_UP,
+  KA_DOWN,
+  KA_CYCLE_LAYOUT
+};
+
+struct KeyMapping {
+  KeyAction action;
+  String    text;     // UTF-8; used if action is KA_CHAR or KA_DEAD
+};
+
+struct KeyEvent {
+  bool      hasEvent; // true if an input was produced
+  KeyAction action;
+  String    text;     // UTF-8 payload
+  uint8_t   row;      // 0..3
+  uint8_t   col;      // 0..9
+};
+
+// 3 layers: normal/shift/fn, 4x10 matrix each
+struct KeyboardLayout {
+  String name;
+  String description;
+  KeyMapping normal[4][10];
+  KeyMapping shift_[4][10];
+  KeyMapping fn[4][10];
+  std::map<String, std::map<String, String>> deadKeys;
+};
+
+// Dead-key composition rule
+struct DeadRule {
+  String accent;  // e.g., "´"
+  String base;    // e.g., "a"
+  String out;     // e.g., "á"
+};
+
+// Active keyboard layout and composition table
+extern KeyboardLayout CurrentLayout;
+extern std::vector<DeadRule> DeadTable;
+extern String CurrentDead;         // empty if none
+extern String CurrentLayoutName;   // persisted in Preferences
+
 extern uint8_t partialCounter;
 extern volatile bool forceSlowFullUpdate;
 
@@ -221,6 +293,38 @@ void playJingle(String jingle);
 void deepSleep(bool alternateScreenSaver = false);
 void loadState(bool changeState = true);
 int stringToInt(String str);
+
+// UTF-8 keyboard layout functions
+bool loadKeyboardLayout(const String& filename);
+void setKeyboardLayout(const KeyboardLayout& layout);
+void initializeFallbackLayout();
+String getCurrentLayoutName();
+void mirrorLayoutToLegacy();
+String composeDeadKey(const String& deadKey, const String& baseChar);
+String utf8SafeBackspace(const String& text);
+int utf8CharLength(char firstByte);
+KeyEvent updateKeypressUTF8();
+void cycleKeyboardLayout();
+
+// UTF-8 rendering functions
+void printUTF8(int16_t x, int16_t y, const String& text);
+void printUTF8(const String& text);
+void setCursorUTF8(int16_t x, int16_t y);
+void getTextBoundsUTF8(const String& text, int16_t x, int16_t y, int16_t* x1, int16_t* y1, uint16_t* w, uint16_t* h);
+
+// Layout I/O
+bool loadKeyboardLayoutFromFile(const char* path);
+bool selectKeyboardLayout(const String& name); // loads /sys/kbd/<name>.json
+void applyLayoutToLegacyArrays();              // keeps old ASCII code working
+
+// UTF-8 helpers
+int  utf8_length(const String& s);             // number of codepoints
+void utf8_pop_back_inplace(String& s);         // erase last codepoint safely
+String composeDeadIfAny(const String& base);   // returns composed char(s)
+bool loadKeyboardLayout(const String& layoutName); // load keyboard layout
+
+// UTF-8 aware key reader (new); legacy updateKeypress() remains for non-TXT apps
+KeyEvent updateKeypressUTF8();
 
 // microSD
 void listDir(fs::FS &fs, const char *dirname);

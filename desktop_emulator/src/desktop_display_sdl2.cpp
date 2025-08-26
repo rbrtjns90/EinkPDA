@@ -12,7 +12,7 @@ DesktopDisplay* g_display = nullptr;
 DesktopDisplay::DesktopDisplay() 
     : einkWindow(nullptr), oledWindow(nullptr), einkRenderer(nullptr), oledRenderer(nullptr),
       einkTexture(nullptr), oledTexture(nullptr), font(nullptr), smallFont(nullptr),
-      lastKey(0) {
+      lastKey(0), hasUTF8InputData(false) {
     memset(keyPressed, false, sizeof(keyPressed));
 }
 
@@ -39,6 +39,9 @@ bool DesktopDisplay::init() {
         std::cerr << "[SDL2] SDL_Init failed: " << SDL_GetError() << std::endl;
         return false;
     }
+    
+    // Enable text input for UTF-8 support
+    SDL_StartTextInput();
 
     // Initialize SDL_ttf
     if (TTF_Init() == -1) {
@@ -541,14 +544,28 @@ void DesktopDisplay::oledUpdate() {
     updateOledTexture();
 }
 
-// Input handling
+// UTF-8 text input handling
 bool DesktopDisplay::handleEvents() {
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) {
             return false;
+        } else if (e.type == SDL_TEXTINPUT) {
+            // Skip SDL text input - use keyboard layout system instead
+            std::cout << "[UTF8] Skipping SDL text input: '" << e.text.text << "' - using layout system" << std::endl;
         } else if (e.type == SDL_KEYDOWN) {
-            // Map special keys for PocketMage compatibility
+            // Check for modifier keys and special combinations
+            SDL_Keymod modifiers = SDL_GetModState();
+            bool ctrlPressed = (modifiers & KMOD_CTRL); // Use Ctrl as Fn key on desktop
+            
+            // Handle Ctrl+K combination for keyboard layout switching
+            if (ctrlPressed && e.key.keysym.sym == SDLK_k) {
+                lastKey = -1; // Special code for Ctrl+K (Fn+K equivalent)
+                std::cout << "[KEYBOARD] Ctrl+K detected for layout switching" << std::endl;
+                return true;
+            }
+            
+            // Map all keys through PocketMage keyboard layout system
             switch (e.key.keysym.sym) {
                 case SDLK_UP:
                     lastKey = 19;  // ASCII 19 - UP arrow for PocketMage
@@ -583,9 +600,28 @@ bool DesktopDisplay::handleEvents() {
                     lastKey = 8;   // ASCII 8 - Backspace
                     std::cout << "[KEYBOARD] Mapped to BACKSPACE" << std::endl;
                     break;
+                case SDLK_TAB:
+                    lastKey = 9;   // ASCII 9 - Tab
+                    std::cout << "[KEYBOARD] Mapped to TAB" << std::endl;
+                    break;
+                case SDLK_SPACE:
+                    lastKey = 32;  // ASCII 32 - Space
+                    std::cout << "[KEYBOARD] Mapped to SPACE" << std::endl;
+                    break;
+                // Map apostrophe key to trigger dead key processing
+                case SDLK_QUOTE:
+                    lastKey = 100; // Special code for apostrophe dead key
+                    std::cout << "[KEYBOARD] Apostrophe key detected for dead key processing" << std::endl;
+                    break;
                 default:
-                    lastKey = e.key.keysym.sym;
-                    std::cout << "[SDL2] Key pressed: " << (char)lastKey << std::endl;
+                    // Map regular character keys through layout system
+                    if (e.key.keysym.sym >= 32 && e.key.keysym.sym <= 126) {
+                        lastKey = e.key.keysym.sym;
+                        std::cout << "[KEYBOARD] Character key: " << (char)lastKey << " (" << lastKey << ")" << std::endl;
+                    } else {
+                        lastKey = e.key.keysym.sym;
+                        std::cout << "[SDL2] Special key pressed: " << lastKey << std::endl;
+                    }
                     break;
             }
             keyPressed[e.key.keysym.scancode] = true;
@@ -604,6 +640,21 @@ char DesktopDisplay::getLastKey() {
 
 bool DesktopDisplay::isKeyPressed(SDL_Scancode key) {
     return keyPressed[key];
+}
+
+// UTF-8 text input methods
+bool DesktopDisplay::hasUTF8Input() {
+    return hasUTF8InputData;
+}
+
+std::string DesktopDisplay::getUTF8Input() {
+    if (hasUTF8InputData) {
+        std::string result = utf8InputBuffer;
+        utf8InputBuffer.clear();
+        hasUTF8InputData = false;
+        return result;
+    }
+    return "";
 }
 
 // Utility
@@ -712,3 +763,5 @@ void DesktopDisplay::renderOledText(const std::string& line1, const std::string&
     SDL_RenderCopy(oledRenderer, oledTexture, nullptr, nullptr);
     SDL_RenderPresent(oledRenderer);
 }
+
+// Duplicate UTF-8 methods removed - using implementations above

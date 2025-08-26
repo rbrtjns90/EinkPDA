@@ -1,5 +1,6 @@
 #include "pocketmage_compat.h"
-#include "desktop_display.h"
+#include "desktop_display_sdl2.h"
+#include "globals.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -16,8 +17,7 @@ extern DesktopDisplay* g_display;
 
 // TXT app variables are defined in globals.cpp
 
-// Include AppState enum definition
-enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
+// AppState enum is now defined in globals.h
 #include "GxEPD2_BW.h"
 #include "U8g2lib.h"
 #include "Buzzer.h"
@@ -161,8 +161,7 @@ void oledWord(const char* text, bool clear, bool send) {
 // Duplicate functions removed - implemented in real PocketMage source
 
 // PocketMage configuration constants - duplicates removed, defined in real PocketMage globals.cpp
-bool SET_CLOCK_ON_UPLOAD = false;
-String SLEEPMODE = "NORMAL";
+// Configuration variables are now defined as macros in config.h
 
 // useFastFullUpdate is defined in real PocketMage globals.cpp
 
@@ -383,16 +382,157 @@ int digitalRead(uint8_t pin) { return 0; }
 void digitalWrite(uint8_t pin, uint8_t value) {}
 int analogRead(uint8_t pin) { return 512; }
 
-// Override updateKeypress to directly return SDL2 keyboard input
+bool emulatorConsumeUTF8(String& output) {
+    if (g_display && g_display->hasUTF8Input()) {
+        std::string utf8Text = g_display->getUTF8Input();
+        output = String(utf8Text.c_str());
+        std::cout << "[UTF8] emulatorConsumeUTF8() returning: '" << output.c_str() << "'" << std::endl;
+        return true;
+    }
+    return false;
+}
+
+// Missing function implementations for linker
 char updateKeypress() {
+    // Legacy keyboard function - return no key pressed
+    return 0;
+}
+
+String utf8SafeBackspace(const String& text) {
+    if (text.length() == 0) return text;
+    
+    // Simple implementation - remove last character
+    // In a full implementation, this would handle UTF-8 multi-byte characters properly
+    String result = text;
+    result.remove(result.length() - 1);
+    return result;
+}
+
+bool loadKeyboardLayout(const String& layoutName) {
+    std::cout << "[UTF8] loadKeyboardLayout() called with: " << layoutName.c_str() << std::endl;
+    
+    // Manually populate DeadTable for emulator since JSON loading isn't working
+    DeadTable.clear();
+    
+    // Apostrophe (') dead key combinations
+    DeadTable.push_back({"'", "a", "á"});
+    DeadTable.push_back({"'", "e", "é"});
+    DeadTable.push_back({"'", "i", "í"});
+    DeadTable.push_back({"'", "o", "ó"});
+    DeadTable.push_back({"'", "u", "ú"});
+    DeadTable.push_back({"'", "y", "ý"});
+    DeadTable.push_back({"'", "A", "Á"});
+    DeadTable.push_back({"'", "E", "É"});
+    DeadTable.push_back({"'", "I", "Í"});
+    DeadTable.push_back({"'", "O", "Ó"});
+    DeadTable.push_back({"'", "U", "Ú"});
+    DeadTable.push_back({"'", "Y", "Ý"});
+    DeadTable.push_back({"'", "c", "ć"});
+    DeadTable.push_back({"'", "C", "Ć"});
+    DeadTable.push_back({"'", "n", "ń"});
+    DeadTable.push_back({"'", "N", "Ń"});
+    DeadTable.push_back({"'", "s", "ś"});
+    DeadTable.push_back({"'", "S", "Ś"});
+    DeadTable.push_back({"'", "z", "ź"});
+    DeadTable.push_back({"'", "Z", "Ź"});
+    
+    std::cout << "[UTF8] Populated DeadTable with " << DeadTable.size() << " rules" << std::endl;
+    
+    return true;
+}
+
+KeyEvent updateKeypressUTF8() {
+    KeyEvent ev{false, KA_NONE, "", 0, 0};
+
+#ifdef DESKTOP_EMULATOR
+    // Check for special keys first
     if (g_display) {
-        char key = g_display->getLastKey();
-        if (key != 0) {
-            std::cout << "[KEYBOARD] updateKeypress() returning: '" << key << "' (ASCII " << (int)key << ")" << std::endl;
-            return key;
+        char lastKey = g_display->getLastKey();
+        if (lastKey != 0) {
+            ev.hasEvent = true;
+            std::cout << "[UTF8] Special key detected: " << (int)lastKey << std::endl;
+            
+            switch (lastKey) {
+                case 8: ev.action = KA_BACKSPACE; return ev;
+                case 13: ev.action = KA_ENTER; return ev;
+                case 27: ev.action = KA_ESC; return ev;
+                case 9: ev.action = KA_TAB; return ev;
+                case 32: ev.action = KA_SPACE; return ev;
+                case 18: ev.action = KA_RIGHT; return ev;
+                case 19: ev.action = KA_UP; return ev;
+                case 20: ev.action = KA_LEFT; return ev;
+                case 21: ev.action = KA_DOWN; return ev;
+                case 12: ev.action = KA_HOME; return ev;
+                case -1: ev.action = KA_CYCLE_LAYOUT; std::cout << "[KEYBOARD] Fn+K mapped to KA_CYCLE_LAYOUT" << std::endl; return ev;
+                case 100: ev.action = KA_DEAD; ev.text = "'"; std::cout << "[KEYBOARD] Apostrophe mapped to KA_DEAD" << std::endl; return ev;
+                default:
+                    // Handle regular character keys (a-z, A-Z, 0-9, etc.)
+                    if (lastKey >= 32 && lastKey <= 126) {
+                        ev.action = KA_CHAR;
+                        ev.text = String((char)lastKey);
+                        std::cout << "[KEYBOARD] Character key mapped: '" << (char)lastKey << "'" << std::endl;
+                        return ev;
+                    } else {
+                        std::cout << "[UTF8] Unmapped special key: " << (int)lastKey << std::endl;
+                        ev.hasEvent = false;
+                        break;
+                    }
+            }
         }
     }
-    return 0;
+    
+    // Check for UTF-8 text input
+    String host;
+    if (emulatorConsumeUTF8(host)) {
+        KeyEvent ev{true, KA_CHAR, host, 0, 0};
+        std::cout << "[UTF8] Text input: '" << host.c_str() << "'" << std::endl;
+        return ev;
+    }
+#endif
+
+    // For emulator, return no event
+    return ev;
+}
+
+void mirrorLayoutToLegacy() {
+    // Mirror current layout to legacy arrays for compatibility
+    // Implementation would copy CurrentLayout to legacy key arrays
+    std::cout << "[UTF8] mirrorLayoutToLegacy() called" << std::endl;
+}
+
+void stringToVector(String inputText) {
+    // Implementation for the void version declared in globals.h
+    std::cout << "[UTF8] stringToVector() called with: " << inputText.c_str() << std::endl;
+}
+
+void cycleKeyboardLayout() {
+    // Available keyboard layouts in order
+    static const String layouts[] = {"us-basic", "us-latin", "fr-azerty", "de-qwertz"};
+    static const int layoutCount = 4;
+    
+    // Find current layout index
+    int currentIndex = 0;
+    for (int i = 0; i < layoutCount; i++) {
+        if (CurrentLayoutName == layouts[i]) {
+            currentIndex = i;
+            break;
+        }
+    }
+    
+    // Cycle to next layout
+    int nextIndex = (currentIndex + 1) % layoutCount;
+    String nextLayout = layouts[nextIndex];
+    
+    std::cout << "[KEYBOARD] Cycling from " << CurrentLayoutName.c_str() << " to " << nextLayout.c_str() << std::endl;
+    
+    // For emulator, just update the current layout name and show message
+    CurrentLayoutName = nextLayout;
+    if (g_display) {
+        g_display->oledClear();
+        g_display->oledDrawText(("Keyboard: " + nextLayout).c_str(), 0, 16);
+        g_display->oledUpdate();
+    }
+    std::cout << "[KEYBOARD] Switched to layout: " << nextLayout.c_str() << std::endl;
 }
 
 // Full implementations for missing sysFunc.cpp functions
@@ -431,7 +571,7 @@ void checkTimeout() {
     // Mock timeout check - PocketMage uses this for power management
 }
 
-std::vector<String> stringToVector(String str) {
+std::vector<String> stringToVectorImpl(String str) {
     std::vector<String> result;
     String current = "";
     for (int i = 0; i < str.length(); i++) {

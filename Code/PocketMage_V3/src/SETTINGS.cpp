@@ -1,4 +1,7 @@
 #include "globals.h"
+#ifdef DESKTOP_EMULATOR
+#include "U8g2lib.h"
+#endif
 
 void SETTINGS_INIT() {
   // OPEN SETTINGS

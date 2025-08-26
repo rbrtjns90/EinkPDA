@@ -1,5 +1,8 @@
 #include "globals.h"
 #include "sdmmc_cmd.h"
+#ifdef DESKTOP_EMULATOR
+#include "U8g2lib.h"
+#endif
 
 //   .oooooo..o oooooooooooo ooooooooooooo ooooo     ooo ooooooooo.    //
 //  d8P'    `Y8 `888'     `8 8'   888   `8 `888'     `8' `888   `Y88.  //
@@ -159,3 +162,81 @@ JournalState CurrentJournalState;
 
 // <POKEDEX.cpp>
 PokedexState CurrentPokedexState = POKE_LIST;
+
+// UTF-8 Keyboard Layout System
+KeyboardLayout CurrentLayout;
+std::vector<DeadRule> DeadTable;
+String CurrentDead = "";
+String CurrentLayoutName = "us-latin"; // default; persisted in Preferences
+
+// Initialize a basic fallback keyboard layout when JSON loading fails
+void initializeFallbackLayout() {
+  CurrentLayout.name = "Fallback US";
+  CurrentLayout.description = "Basic fallback layout";
+  
+  // Initialize normal layer - basic QWERTY
+  CurrentLayout.normal[0][0] = {KA_CHAR, "1"}; CurrentLayout.normal[0][1] = {KA_CHAR, "2"}; CurrentLayout.normal[0][2] = {KA_CHAR, "3"}; CurrentLayout.normal[0][3] = {KA_CHAR, "4"}; CurrentLayout.normal[0][4] = {KA_CHAR, "5"};
+  CurrentLayout.normal[0][5] = {KA_CHAR, "6"}; CurrentLayout.normal[0][6] = {KA_CHAR, "7"}; CurrentLayout.normal[0][7] = {KA_CHAR, "8"}; CurrentLayout.normal[0][8] = {KA_CHAR, "9"}; CurrentLayout.normal[0][9] = {KA_CHAR, "0"};
+  
+  CurrentLayout.normal[1][0] = {KA_CHAR, "q"}; CurrentLayout.normal[1][1] = {KA_CHAR, "w"}; CurrentLayout.normal[1][2] = {KA_CHAR, "e"}; CurrentLayout.normal[1][3] = {KA_CHAR, "r"}; CurrentLayout.normal[1][4] = {KA_CHAR, "t"};
+  CurrentLayout.normal[1][5] = {KA_CHAR, "y"}; CurrentLayout.normal[1][6] = {KA_CHAR, "u"}; CurrentLayout.normal[1][7] = {KA_CHAR, "i"}; CurrentLayout.normal[1][8] = {KA_CHAR, "o"}; CurrentLayout.normal[1][9] = {KA_CHAR, "p"};
+  
+  CurrentLayout.normal[2][0] = {KA_CHAR, "a"}; CurrentLayout.normal[2][1] = {KA_CHAR, "s"}; CurrentLayout.normal[2][2] = {KA_CHAR, "d"}; CurrentLayout.normal[2][3] = {KA_CHAR, "f"}; CurrentLayout.normal[2][4] = {KA_CHAR, "g"};
+  CurrentLayout.normal[2][5] = {KA_CHAR, "h"}; CurrentLayout.normal[2][6] = {KA_CHAR, "j"}; CurrentLayout.normal[2][7] = {KA_CHAR, "k"}; CurrentLayout.normal[2][8] = {KA_CHAR, "l"}; CurrentLayout.normal[2][9] = {KA_ENTER, ""};
+  
+  CurrentLayout.normal[3][0] = {KA_SHIFT, ""}; CurrentLayout.normal[3][1] = {KA_CHAR, "z"}; CurrentLayout.normal[3][2] = {KA_CHAR, "x"}; CurrentLayout.normal[3][3] = {KA_CHAR, "c"}; CurrentLayout.normal[3][4] = {KA_CHAR, "v"};
+  CurrentLayout.normal[3][5] = {KA_CHAR, "b"}; CurrentLayout.normal[3][6] = {KA_CHAR, "n"}; CurrentLayout.normal[3][7] = {KA_CHAR, "m"}; CurrentLayout.normal[3][8] = {KA_BACKSPACE, ""}; CurrentLayout.normal[3][9] = {KA_FN, ""};
+  
+  // Initialize shift layer
+  CurrentLayout.shift_[0][0] = {KA_CHAR, "!"}; CurrentLayout.shift_[0][1] = {KA_CHAR, "@"}; CurrentLayout.shift_[0][2] = {KA_CHAR, "#"}; CurrentLayout.shift_[0][3] = {KA_CHAR, "$"}; CurrentLayout.shift_[0][4] = {KA_CHAR, "%"};
+  CurrentLayout.shift_[0][5] = {KA_CHAR, "^"}; CurrentLayout.shift_[0][6] = {KA_CHAR, "&"}; CurrentLayout.shift_[0][7] = {KA_CHAR, "*"}; CurrentLayout.shift_[0][8] = {KA_CHAR, "("}; CurrentLayout.shift_[0][9] = {KA_CHAR, ")"};
+  
+  CurrentLayout.shift_[1][0] = {KA_CHAR, "Q"}; CurrentLayout.shift_[1][1] = {KA_CHAR, "W"}; CurrentLayout.shift_[1][2] = {KA_CHAR, "E"}; CurrentLayout.shift_[1][3] = {KA_CHAR, "R"}; CurrentLayout.shift_[1][4] = {KA_CHAR, "T"};
+  CurrentLayout.shift_[1][5] = {KA_CHAR, "Y"}; CurrentLayout.shift_[1][6] = {KA_CHAR, "U"}; CurrentLayout.shift_[1][7] = {KA_CHAR, "I"}; CurrentLayout.shift_[1][8] = {KA_CHAR, "O"}; CurrentLayout.shift_[1][9] = {KA_CHAR, "P"};
+  
+  CurrentLayout.shift_[2][0] = {KA_CHAR, "A"}; CurrentLayout.shift_[2][1] = {KA_CHAR, "S"}; CurrentLayout.shift_[2][2] = {KA_CHAR, "D"}; CurrentLayout.shift_[2][3] = {KA_CHAR, "F"}; CurrentLayout.shift_[2][4] = {KA_CHAR, "G"};
+  CurrentLayout.shift_[2][5] = {KA_CHAR, "H"}; CurrentLayout.shift_[2][6] = {KA_CHAR, "J"}; CurrentLayout.shift_[2][7] = {KA_CHAR, "K"}; CurrentLayout.shift_[2][8] = {KA_CHAR, "L"}; CurrentLayout.shift_[2][9] = {KA_ENTER, ""};
+  
+  CurrentLayout.shift_[3][0] = {KA_SHIFT, ""}; CurrentLayout.shift_[3][1] = {KA_CHAR, "Z"}; CurrentLayout.shift_[3][2] = {KA_CHAR, "X"}; CurrentLayout.shift_[3][3] = {KA_CHAR, "C"}; CurrentLayout.shift_[3][4] = {KA_CHAR, "V"};
+  CurrentLayout.shift_[3][5] = {KA_CHAR, "B"}; CurrentLayout.shift_[3][6] = {KA_CHAR, "N"}; CurrentLayout.shift_[3][7] = {KA_CHAR, "M"}; CurrentLayout.shift_[3][8] = {KA_BACKSPACE, ""}; CurrentLayout.shift_[3][9] = {KA_FN, ""};
+  
+  // Initialize fn layer with symbols and navigation
+  CurrentLayout.fn[0][0] = {KA_CHAR, "1"}; CurrentLayout.fn[0][1] = {KA_CHAR, "2"}; CurrentLayout.fn[0][2] = {KA_CHAR, "3"}; CurrentLayout.fn[0][3] = {KA_CHAR, "4"}; CurrentLayout.fn[0][4] = {KA_CHAR, "5"};
+  CurrentLayout.fn[0][5] = {KA_CHAR, "6"}; CurrentLayout.fn[0][6] = {KA_CHAR, "7"}; CurrentLayout.fn[0][7] = {KA_CHAR, "8"}; CurrentLayout.fn[0][8] = {KA_CHAR, "9"}; CurrentLayout.fn[0][9] = {KA_CHAR, "0"};
+  
+  CurrentLayout.fn[1][0] = {KA_CHAR, "-"}; CurrentLayout.fn[1][1] = {KA_CHAR, "="}; CurrentLayout.fn[1][2] = {KA_CHAR, "["}; CurrentLayout.fn[1][3] = {KA_CHAR, "]"}; CurrentLayout.fn[1][4] = {KA_CHAR, "\\"};
+  CurrentLayout.fn[1][5] = {KA_LEFT, ""}; CurrentLayout.fn[1][6] = {KA_RIGHT, ""}; CurrentLayout.fn[1][7] = {KA_UP, ""}; CurrentLayout.fn[1][8] = {KA_DOWN, ""}; CurrentLayout.fn[1][9] = {KA_CHAR, "`"};
+  
+  CurrentLayout.fn[2][0] = {KA_TAB, ""}; CurrentLayout.fn[2][1] = {KA_SAVE, ""}; CurrentLayout.fn[2][2] = {KA_ESC, ""}; CurrentLayout.fn[2][3] = {KA_FILE, ""}; CurrentLayout.fn[2][4] = {KA_FONT, ""};
+  CurrentLayout.fn[2][5] = {KA_HOME, ""}; CurrentLayout.fn[2][6] = {KA_CHAR, ";"}; CurrentLayout.fn[2][7] = {KA_CHAR, "'"}; CurrentLayout.fn[2][8] = {KA_LOAD, ""}; CurrentLayout.fn[2][9] = {KA_ENTER, ""};
+  
+  CurrentLayout.fn[3][0] = {KA_SHIFT, ""}; CurrentLayout.fn[3][1] = {KA_CHAR, ","}; CurrentLayout.fn[3][2] = {KA_CHAR, "."}; CurrentLayout.fn[3][3] = {KA_CLEAR, ""}; CurrentLayout.fn[3][4] = {KA_CHAR, "/"};
+  CurrentLayout.fn[3][5] = {KA_SPACE, " "}; CurrentLayout.fn[3][6] = {KA_CHAR, "?"}; CurrentLayout.fn[3][7] = {KA_CHAR, ":"}; CurrentLayout.fn[3][8] = {KA_BACKSPACE, ""}; CurrentLayout.fn[3][9] = {KA_FN, ""};
+  
+  // No dead keys in fallback layout
+  CurrentLayout.deadKeys.clear();
+  
+  // Mirror to legacy arrays
+  mirrorLayoutToLegacy();
+}
+
+// Dead-key composition (data-driven)
+String composeDeadIfAny(const String& base) {
+  if (CurrentDead.length() == 0) return base;
+  
+  std::cout << "[DEAD] Looking for accent: '" << CurrentDead.c_str() << "' + base: '" << base.c_str() << "'" << std::endl;
+  std::cout << "[DEAD] DeadTable size: " << DeadTable.size() << std::endl;
+  
+  for (const auto& r : DeadTable) {
+    std::cout << "[DEAD] Checking rule: '" << r.accent.c_str() << "' + '" << r.base.c_str() << "' -> '" << r.out.c_str() << "'" << std::endl;
+    if (r.accent == CurrentDead && r.base == base) {
+      CurrentDead = "";
+      std::cout << "[DEAD] Match found! Returning: '" << r.out.c_str() << "'" << std::endl;
+      return r.out;
+    }
+  }
+  // fallback: just emit the base character (no accent found)
+  std::cout << "[DEAD] No match found, returning base character: '" << base.c_str() << "'" << std::endl;
+  CurrentDead = "";
+  return base;
+}
