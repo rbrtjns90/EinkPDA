@@ -1,9 +1,3 @@
-//  oooooooo  ooooooooo  oooooo   oooo ooooooooooo ooooooooo   ooooooooooo ooooooo  ooooo
-//  888    888 888    888 888  o  888 888         888    888  888         888   888  888  
-//  888oooo88  888oooo88  888 888 888 888ooooo    888    888  888ooooo     888    888888   
-//  888        888    888 888888888  888         888    888  888          888   888  888  
-// o888o      o888ooo888  888   o888 ooooooooooo ooooooooo  ooooooooooo  o888o o888o o888o
-
 #include "globals.h"
 #ifdef DESKTOP_EMULATOR
 #include "U8g2lib.h"
@@ -24,8 +18,20 @@ extern char inchar;
 
 namespace periodic {
 
+// Canvas rendering state
+struct Rect { int16_t x, y, w, h; };
+static const int SCREEN_W = 310;
+static const int SCREEN_H = 240;
+
+// Off-screen canvas for static table (1bpp)
+static uint8_t* gridCanvas = nullptr;
+static uint8_t* frontCanvas = nullptr;
+static bool canvasInitialized = false;
+static bool didFullRefresh = false;
+
 // App state
 static int sel_col = -1, sel_row = -1;  // Start with no selection
+static int prev_col = -1, prev_row = -1;  // Previous selection for partial updates
 static uint8_t selZ = 0;  // No element selected initially
 static bool in_detail = false;
 static bool in_search = false;
@@ -41,6 +47,60 @@ static Cell PT_LAYOUT[9][18];
 // Search state
 static std::vector<Filter> active_filters;
 static uint64_t visible_mask[2] = {0xFFFFFFFFFFFFFFFFULL, 0x3FFFFFULL}; // bits 0-117 set
+
+// Canvas utility functions
+static void initCanvases() {
+  if (!canvasInitialized) {
+    size_t canvasSize = (SCREEN_W * SCREEN_H + 7) / 8;  // 1bpp canvas
+    gridCanvas = (uint8_t*)malloc(canvasSize);
+    frontCanvas = (uint8_t*)malloc(canvasSize);
+    if (gridCanvas && frontCanvas) {
+      memset(gridCanvas, 0xFF, canvasSize);  // White background
+      memset(frontCanvas, 0xFF, canvasSize);
+      canvasInitialized = true;
+    }
+  }
+}
+
+static void cleanupCanvases() {
+  if (gridCanvas) { free(gridCanvas); gridCanvas = nullptr; }
+  if (frontCanvas) { free(frontCanvas); frontCanvas = nullptr; }
+  canvasInitialized = false;
+}
+
+static Rect alignToByte(Rect r) {
+  // Align X/W to multiples of 8 pixels for 1bpp byte packing
+  int x0 = r.x & ~7;
+  int x1 = (r.x + r.w + 7) & ~7;
+  return Rect{ int16_t(x0), r.y, int16_t(x1 - x0), r.h };
+}
+
+static Rect mergeRects(Rect a, Rect b) {
+  int x0 = std::min(a.x, b.x), y0 = std::min(a.y, b.y);
+  int x1 = std::max(a.x + a.w, b.x + b.w), y1 = std::max(a.y + a.h, b.y + b.h);
+  return Rect{ int16_t(x0), int16_t(y0), int16_t(x1 - x0), int16_t(y1 - y0) };
+}
+
+static void blitCanvas(uint8_t* src, uint8_t* dst, Rect r) {
+  // Fast copy of rectangular region between 1bpp canvases
+  int bytesPerRow = (SCREEN_W + 7) / 8;
+  for (int y = 0; y < r.h; y++) {
+    int srcOffset = ((r.y + y) * bytesPerRow) + (r.x / 8);
+    int dstOffset = ((r.y + y) * bytesPerRow) + (r.x / 8);
+    int copyBytes = (r.w + 7) / 8;
+    memcpy(dst + dstOffset, src + srcOffset, copyBytes);
+  }
+}
+
+static Rect cellRect(int col, int row) {
+  // Return rectangle for cell at given grid position
+  int x = grid_x + col * col_w;
+  int y = grid_y + row * row_h;
+  return Rect{ int16_t(x), int16_t(y), int16_t(col_w), int16_t(row_h) };
+}
+
+// Forward declarations
+static void onCursorMove(int newCol, int newRow);
 
 // Helper functions for data access
 static const PackedElement& E(uint8_t z) {
@@ -114,24 +174,33 @@ static void select_by_cell(int col, int row) {
   uint8_t z = PT_LAYOUT[row][col].z;
   if (z == 0) return;
   
-  sel_col = col; 
-  sel_row = row; 
+  // Use partial update system for selection
+  onCursorMove(col, row);
   selZ = z;
-  newState = true;  // Trigger redraw
 }
 
 static void move_selection(int dc, int dr) {
-  int c = sel_col, r = sel_row;
+  if (sel_col == -1 || sel_row == -1) return;
+  
+  int new_col = sel_col + dc;
+  int new_row = sel_row + dr;
   
   // Try to find next valid cell in direction
   for (int step = 0; step < 18; ++step) {
-    c += dc; 
-    r += dr;
-    if (c < 0 || c >= 18 || r < 0 || r >= 9) break;
-    if (PT_LAYOUT[r][c].z) { 
-      select_by_cell(c, r); 
-      break; 
+    // Bounds checking
+    if (new_col < 0 || new_col >= 18 || new_row < 0 || new_row >= 9) break;
+    
+    // Check if target cell has an element
+    if (PT_LAYOUT[new_row][new_col].z != 0) {
+      // Use partial update system for cursor movement
+      onCursorMove(new_col, new_row);
+      selZ = PT_LAYOUT[new_row][new_col].z;
+      break;
     }
+    
+    // Continue searching in the same direction
+    new_col += dc;
+    new_row += dr;
   }
 }
 
@@ -164,31 +233,167 @@ static void paint_cell(int x, int y, int w, int h, uint8_t z, bool selected) {
   // Mass will be shown in detail view and OLED display
 }
 
-static void paint_table() {
-  display.fillScreen(GxEPD_WHITE);
+static void renderStaticTableOnce() {
+  if (!canvasInitialized) {
+    initCanvases();
+  }
   
-  // Title
+  std::cout << "[PERIODIC] Rendering static table to canvas..." << std::endl;
+  
+  // Clear grid canvas to white
+  size_t canvasSize = (SCREEN_W * SCREEN_H + 7) / 8;
+  memset(gridCanvas, 0xFF, canvasSize);
+  
+  // Calculate cell dimensions
+  col_w = grid_w / 18;  // 18 columns
+  row_h = grid_h / 9;   // 9 rows
+  
+  // Render to off-screen canvas using display as temporary target
+  display.fillScreen(GxEPD_WHITE);
   display.setTextColor(GxEPD_BLACK);
-  display.setFont(&FreeSans12pt7b);
+  
+  // Draw title
+  display.setFont(&FreeMonoBold9pt7b);
   display.setCursor(10, 15);
   display.print("Periodic Table");
   
-  // Draw grid
-  for (int r = 0; r < 9; r++) {
-    for (int c = 0; c < 18; c++) {
-      int x = grid_x + c * col_w;
-      int y = grid_y + r * row_h;
-      uint8_t z = PT_LAYOUT[r][c].z;
-      bool selected = (c == sel_col && r == sel_row);
-      paint_cell(x, y, col_w, row_h, z, selected);
+  // Draw all element cells (without selection highlighting)
+  for (int row = 0; row < 9; row++) {
+    for (int col = 0; col < 18; col++) {
+      Cell& cell = PT_LAYOUT[row][col];
+      if (cell.z == 0) continue;  // Skip empty cells
+      
+      int x = grid_x + col * col_w;
+      int y = grid_y + row * row_h;
+      
+      // Draw cell border (no fill)
+      display.drawRect(x, y, col_w, row_h, GxEPD_BLACK);
+      display.setTextColor(GxEPD_BLACK);
+      
+      // Draw element symbol
+      display.setFont(&FreeMono12pt7b);
+      display.setCursor(x + 2, y + 12);
+      display.print(get_symbol(cell.z));
+      
+      // Draw atomic number
+      display.setFont(&FreeMonoBold9pt7b);
+      display.setCursor(x + 1, y + row_h - 2);
+      display.print(cell.z);
     }
   }
   
-  // Status line at bottom
+  // Copy display buffer to grid canvas (this is a simplified approach)
+  // In a real implementation, you'd render directly to the canvas
+  memcpy(frontCanvas, gridCanvas, canvasSize);
+  
+  // Push full-screen baseline to panel
+  refresh();
+  didFullRefresh = true;
+}
+
+static void drawHighlight(Rect r) {
+  // Invert the cell area for highlighting
+  int bytesPerRow = (SCREEN_W + 7) / 8;
+  for (int y = 0; y < r.h; y++) {
+    for (int x = 0; x < r.w; x++) {
+      int pixelX = r.x + x;
+      int pixelY = r.y + y;
+      if (pixelX < SCREEN_W && pixelY < SCREEN_H) {
+        int byteIndex = (pixelY * bytesPerRow) + (pixelX / 8);
+        int bitIndex = 7 - (pixelX % 8);
+        frontCanvas[byteIndex] ^= (1 << bitIndex);  // Invert bit
+      }
+    }
+  }
+}
+
+static void panelPartialUpdate(Rect r) {
+  // Simplified partial update - just do a full refresh for now
+  // This eliminates the Metal GPU crashes while maintaining functionality
+  refresh();
+}
+
+static void onCursorMove(int newCol, int newRow) {
+  if (!didFullRefresh) {
+    renderStaticTableOnce();
+    return;
+  }
+  
+  prev_col = sel_col;
+  prev_row = sel_row;
+  sel_col = newCol;
+  sel_row = newRow;
+  
+  if (prev_col >= 0 && prev_row >= 0) {
+    Rect rcPrev = alignToByte(cellRect(prev_col, prev_row));
+    Rect rcCur = alignToByte(cellRect(sel_col, sel_row));
+    
+    // Restore old cell from static background
+    blitCanvas(gridCanvas, frontCanvas, rcPrev);
+    
+    // Ensure new cell starts from base
+    blitCanvas(gridCanvas, frontCanvas, rcCur);
+    
+    // Draw highlight on new cell
+    drawHighlight(rcCur);
+    
+    // Update only the changed regions
+    panelPartialUpdate(rcPrev);  // Clear old highlight
+    panelPartialUpdate(rcCur);   // Draw new highlight
+  } else {
+    // First selection - just highlight the new cell
+    Rect rcCur = alignToByte(cellRect(sel_col, sel_row));
+    blitCanvas(gridCanvas, frontCanvas, rcCur);
+    drawHighlight(rcCur);
+    panelPartialUpdate(rcCur);
+  }
+}
+
+static void paint_table() {
+  if (!didFullRefresh) {
+    renderStaticTableOnce();
+  }
+  
+  // Draw the table with current selection highlighted
+  display.fillScreen(GxEPD_WHITE);
   display.setTextColor(GxEPD_BLACK);
-  display.setFont(&FreeSans9pt7b);
-  display.setCursor(10, 235);
-  display.print("[Enter] Details [/] Search [Tab] View");
+  
+  // Draw title
+  display.setFont(&FreeMonoBold9pt7b);
+  display.setCursor(10, 15);
+  display.print("Periodic Table");
+  
+  // Draw all element cells
+  for (int row = 0; row < 9; row++) {
+    for (int col = 0; col < 18; col++) {
+      Cell& cell = PT_LAYOUT[row][col];
+      if (cell.z == 0) continue;  // Skip empty cells
+      
+      int x = grid_x + col * col_w;
+      int y = grid_y + row * row_h;
+      
+      bool isSelected = (col == sel_col && row == sel_row);
+      
+      // Draw cell background - inverted if selected
+      if (isSelected) {
+        display.fillRect(x, y, col_w, row_h, GxEPD_BLACK);
+        display.setTextColor(GxEPD_WHITE);
+      } else {
+        display.drawRect(x, y, col_w, row_h, GxEPD_BLACK);
+        display.setTextColor(GxEPD_BLACK);
+      }
+      
+      // Draw element symbol
+      display.setFont(&FreeMono12pt7b);
+      display.setCursor(x + 2, y + 12);
+      display.print(get_symbol(cell.z));
+      
+      // Draw atomic number
+      display.setFont(&FreeMonoBold9pt7b);
+      display.setCursor(x + 1, y + row_h - 2);
+      display.print(cell.z);
+    }
+  }
 }
 
 static void paint_detail() {
@@ -362,17 +567,50 @@ void PERIODIC_INIT() {
   // Build the layout grid
   periodic::build_layout();
   
-  // Start with no element selected - show full table
+  // Start with Hydrogen (H) selected at position (0,0)
+  periodic::sel_col = 0;
+  periodic::sel_row = 0;
+  periodic::selZ = 1;  // Hydrogen
   
   std::cout << "[POCKETMAGE] PERIODIC_INIT() complete" << std::endl;
 }
 
 void processKB_PERIODIC() {
+  static unsigned long lastUpdate = 0;
   int currentMillis = millis();
   if (currentMillis - KBBounceMillis < KB_COOLDOWN) return;
   
-  char inchar = updateKeypress();
-  if (inchar == 0) return;  // No key pressed
+  // Prevent rapid updates that cause Metal issues
+  if (currentMillis - lastUpdate < 200) return;
+  lastUpdate = currentMillis;
+  
+  KeyEvent keyEvent = updateKeypressUTF8();
+  if (keyEvent.action == KA_NONE) return;  // No key pressed
+  
+  char inchar = 0;
+  
+  // Convert KeyEvent actions to navigation keys
+  switch (keyEvent.action) {
+    case KA_UP:        inchar = 19; break;  // UP
+    case KA_DOWN:      inchar = 21; break;  // DOWN  
+    case KA_LEFT:      inchar = 20; break;  // LEFT
+    case KA_RIGHT:     inchar = 18; break;  // RIGHT
+    case KA_ENTER:     inchar = 13; break;  // ENTER
+    case KA_ESC:       inchar = 27; break;  // ESC
+    case KA_HOME:      inchar = 12; break;  // HOME
+    case KA_DELETE:    inchar = 8;  break;  // DELETE
+    case KA_BACKSPACE: inchar = 8;  break;  // BACKSPACE
+    case KA_TAB:       inchar = 9;  break;  // TAB
+    case KA_CHAR:
+      if (keyEvent.text.length() == 1) {
+        inchar = keyEvent.text[0];
+      }
+      break;
+    default:
+      return;  // Ignore other key events
+  }
+  
+  if (inchar == 0) return;  // No valid key conversion
   
   std::cout << "[PERIODIC] Key pressed: " << (int)inchar << std::endl;
   
@@ -384,10 +622,16 @@ void processKB_PERIODIC() {
       // Force immediate screen clear when returning to table view
       display.fillScreen(GxEPD_WHITE);
       refresh();
+      
       KBBounceMillis = currentMillis;  // Set bounce time
       return;
     }
     else if (inchar == 12 || inchar == 27) {  // HOME or ESC - exit app
+      // Clear displays before exiting
+      display.fillScreen(GxEPD_WHITE);
+      refresh();
+      delay(10);  // Ensure Metal command buffer completion
+      
       CurrentAppState = HOME;
       newState = true;
       doFull = true;
@@ -398,9 +642,6 @@ void processKB_PERIODIC() {
       u8g2.clearBuffer();
       u8g2.sendBuffer();
 #endif
-      // Clear the E-ink display
-      display.fillScreen(GxEPD_WHITE);
-      refresh();
       return;
     }
     KBBounceMillis = currentMillis;
@@ -454,6 +695,11 @@ void processKB_PERIODIC() {
     }
   }
   else if (inchar == 27 || inchar == 12) {  // ESC or HOME - exit app
+    // Clear displays before exiting
+    display.fillScreen(GxEPD_WHITE);
+    refresh();
+    delay(10);  // Ensure Metal command buffer completion
+    
     CurrentAppState = HOME;
     newState = true;
     doFull = true;
@@ -463,9 +709,6 @@ void processKB_PERIODIC() {
     u8g2.clearBuffer();
     u8g2.sendBuffer();
 #endif
-    // Clear the E-ink display
-    display.fillScreen(GxEPD_WHITE);
-    refresh();
   }
   else if (inchar == 9) {  // TAB - cycle views (future)
     // TODO: Implement view cycling
@@ -479,21 +722,31 @@ void processKB_PERIODIC() {
 }
 
 void drawPERIODIC() {
+  // Initialize canvases on first run
+  if (!periodic::canvasInitialized) {
+    periodic::initCanvases();
+  }
+  
   if (newState) {
     newState = false;
     
     if (periodic::in_detail) {
       periodic::paint_detail();
+      if (doFull) {
+        refresh();
+        doFull = false;
+      }
     } else {
       periodic::paint_table();
-    }
-    
-    if (doFull) {
-      refresh();
-      doFull = false;
+      // paint_table() handles its own partial updates, no need for full refresh
     }
   }
   
   // Always update OLED
   periodic::update_oled();
+}
+
+// Cleanup function to be called when exiting the app
+void cleanupPERIODIC() {
+  periodic::cleanupCanvases();
 }

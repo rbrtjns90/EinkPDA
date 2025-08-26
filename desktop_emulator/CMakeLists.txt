@@ -63,6 +63,8 @@ set(POCKETMAGE_SOURCES_MANUAL
     ${POCKETMAGE_SRC}/POKEDEX.cpp
     ${POCKETMAGE_SRC}/PERIODIC.cpp
     ${POCKETMAGE_SRC}/BT.cpp
+    ${POCKETMAGE_SRC}/PokedexUI.cpp
+    ${POCKETMAGE_SRC}/PocketMageGraphics.cpp
 )
 
 # ---------------------------

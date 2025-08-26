@@ -464,7 +464,7 @@ KeyEvent updateKeypressUTF8() {
                 case 21: ev.action = KA_DOWN; return ev;
                 case 12: ev.action = KA_HOME; return ev;
                 case -1: ev.action = KA_CYCLE_LAYOUT; std::cout << "[KEYBOARD] Fn+K mapped to KA_CYCLE_LAYOUT" << std::endl; return ev;
-                case 100: ev.action = KA_DEAD; ev.text = "'"; std::cout << "[KEYBOARD] Apostrophe mapped to KA_DEAD" << std::endl; return ev;
+                case 200: ev.action = KA_DEAD; ev.text = "'"; std::cout << "[KEYBOARD] Apostrophe mapped to KA_DEAD" << std::endl; return ev;
                 default:
                     // Handle regular character keys (a-z, A-Z, 0-9, etc.)
                     if (lastKey >= 32 && lastKey <= 126) {

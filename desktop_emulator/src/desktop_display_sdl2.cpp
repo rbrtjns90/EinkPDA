@@ -5,6 +5,7 @@
 #include <cstring>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 
 // Global instance
 DesktopDisplay* g_display = nullptr;
@@ -22,6 +23,29 @@ DesktopDisplay::~DesktopDisplay() {
 
 bool DesktopDisplay::init() {
     DEBUG_LOG("SDL2", "Initializing DesktopDisplay...");
+    
+    // COMPLETE Metal disabling - set environment variables before SDL init
+    setenv("SDL_RENDER_DRIVER", "software", 1);
+    setenv("SDL_VIDEODRIVER", "cocoa", 1);
+    setenv("SDL_RENDER_SCALE_QUALITY", "0", 1);
+    setenv("SDL_VIDEO_MAC_FULLSCREEN_SPACES", "0", 1);
+    setenv("SDL_RENDER_BATCHING", "0", 1);
+    setenv("SDL_VIDEO_EXTERNAL_CONTEXT", "0", 1);
+    setenv("SDL_RENDER_OPENGL_SHADERS", "0", 1);
+    setenv("SDL_VIDEO_HIGHDPI_DISABLED", "1", 1);
+    setenv("SDL_RENDER_VSYNC", "0", 1);
+    setenv("SDL_METAL_PREFER_LOW_POWER_DEVICE", "0", 1);
+    
+    // Disable Metal completely at system level
+    setenv("METAL_DEVICE_WRAPPER_TYPE", "1", 1);
+    setenv("METAL_DEBUG_ERROR_MODE", "0", 1);
+    setenv("MTL_DEBUG_LAYER", "0", 1);
+    setenv("MTL_SHADER_VALIDATION", "0", 1);
+    setenv("CA_METAL_LAYER_ENABLED", "0", 1);
+    
+    // Force X11-style software rendering
+    setenv("SDL_VIDEO_X11_FORCE_EGL", "0", 1);
+    setenv("SDL_VIDEO_ALLOW_SCREENSAVER", "1", 1);
     
     // Force software rendering and disable Metal completely
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
@@ -62,11 +86,20 @@ bool DesktopDisplay::init() {
     }
 
     // Create renderer with explicit software flag and no acceleration
-    einkRenderer = SDL_CreateRenderer(einkWindow, -1, SDL_RENDERER_SOFTWARE | SDL_RENDERER_TARGETTEXTURE);
+    einkRenderer = SDL_CreateRenderer(einkWindow, -1, SDL_RENDERER_SOFTWARE);
     if (!einkRenderer) {
         std::cerr << "[SDL2] Failed to create E-Ink renderer: " << SDL_GetError() << std::endl;
         cleanup();
         return false;
+    }
+    
+    // Verify we got software renderer
+    SDL_RendererInfo info;
+    if (SDL_GetRendererInfo(einkRenderer, &info) == 0) {
+        std::cout << "[SDL2] E-Ink renderer: " << info.name << " (flags: " << info.flags << ")" << std::endl;
+        if (!(info.flags & SDL_RENDERER_SOFTWARE)) {
+            std::cerr << "[SDL2] WARNING: E-Ink renderer is not software!" << std::endl;
+        }
     }
     
     // Set viewport immediately after creating renderer
@@ -85,11 +118,20 @@ bool DesktopDisplay::init() {
     }
 
     // Create renderer with explicit software flag and no acceleration
-    oledRenderer = SDL_CreateRenderer(oledWindow, -1, SDL_RENDERER_SOFTWARE | SDL_RENDERER_TARGETTEXTURE);
+    oledRenderer = SDL_CreateRenderer(oledWindow, -1, SDL_RENDERER_SOFTWARE);
     if (!oledRenderer) {
         std::cerr << "[SDL2] Failed to create OLED renderer: " << SDL_GetError() << std::endl;
         cleanup();
         return false;
+    }
+    
+    // Verify we got software renderer
+    SDL_RendererInfo oledInfo;
+    if (SDL_GetRendererInfo(oledRenderer, &oledInfo) == 0) {
+        std::cout << "[SDL2] OLED renderer: " << oledInfo.name << " (flags: " << oledInfo.flags << ")" << std::endl;
+        if (!(oledInfo.flags & SDL_RENDERER_SOFTWARE)) {
+            std::cerr << "[SDL2] WARNING: OLED renderer is not software!" << std::endl;
+        }
     }
     
     // Set viewport immediately after creating renderer
@@ -580,7 +622,7 @@ bool DesktopDisplay::handleEvents() {
                     std::cout << "[KEYBOARD] Mapped to LEFT arrow" << std::endl;
                     break;
                 case SDLK_RIGHT:
-                    lastKey = 18;  // ASCII 18 - RIGHT arrow for PocketMage
+                    lastKey = 18;  // ASCII 18 - RIGHT arrow for PocketMage (matches UTF8 handler)
                     std::cout << "[KEYBOARD] Mapped to RIGHT arrow" << std::endl;
                     break;
                 case SDLK_ESCAPE:
@@ -610,7 +652,7 @@ bool DesktopDisplay::handleEvents() {
                     break;
                 // Map apostrophe key to trigger dead key processing
                 case SDLK_QUOTE:
-                    lastKey = 100; // Special code for apostrophe dead key
+                    lastKey = 200; // Special code for apostrophe dead key (avoid conflict with 'd'=100)
                     std::cout << "[KEYBOARD] Apostrophe key detected for dead key processing" << std::endl;
                     break;
                 default:
@@ -674,6 +716,16 @@ SDL_Color DesktopDisplay::getOledColor(bool on) {
 void DesktopDisplay::updateEinkTexture() {
     if (!einkTexture || !einkRenderer) return;
     
+    // Add throttling to prevent excessive rendering calls
+    static auto lastUpdate = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUpdate);
+    
+    if (elapsed.count() < 16) { // Limit to ~60 FPS
+        return;
+    }
+    lastUpdate = now;
+    
     void* pixels;
     int pitch;
     
@@ -697,14 +749,18 @@ void DesktopDisplay::updateEinkTexture() {
     
     SDL_UnlockTexture(einkTexture);
     
-    // Present to screen - set viewport BEFORE any rendering operations
-    SDL_Rect einkViewport = {0, 0, EINK_WIDTH * 3, EINK_HEIGHT * 3};
-    SDL_RenderSetViewport(einkRenderer, &einkViewport);
-    
-    SDL_SetRenderDrawColor(einkRenderer, 128, 128, 128, 255);
-    SDL_RenderClear(einkRenderer);
-    SDL_RenderCopy(einkRenderer, einkTexture, nullptr, nullptr);
-    SDL_RenderPresent(einkRenderer);
+    // Present to screen with error handling
+    try {
+        SDL_Rect einkViewport = {0, 0, EINK_WIDTH * 3, EINK_HEIGHT * 3};
+        SDL_RenderSetViewport(einkRenderer, &einkViewport);
+        
+        SDL_SetRenderDrawColor(einkRenderer, 128, 128, 128, 255);
+        SDL_RenderClear(einkRenderer);
+        SDL_RenderCopy(einkRenderer, einkTexture, nullptr, nullptr);
+        SDL_RenderPresent(einkRenderer);
+    } catch (...) {
+        std::cerr << "[SDL2] Exception during E-Ink rendering" << std::endl;
+    }
 }
 
 void DesktopDisplay::updateOledTexture() {

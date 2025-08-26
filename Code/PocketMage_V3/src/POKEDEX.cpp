@@ -5,6 +5,8 @@
 // o888o      o888ooo888  888   o888 ooooooooooo ooooooooo  ooooooooooo  o888o o888o o888o
 
 #include "globals.h"
+#include "PokedexUI.h"
+#include "PocketMageGraphics.h"
 #ifdef DESKTOP_EMULATOR
 #include "U8g2lib.h"
 #endif
@@ -36,6 +38,21 @@ void drawPokemonDetail(uint16_t pokemonId);
 void drawSearchScreen();
 Pokemon* findPokemonById(uint16_t id);
 
+// New UI system functions
+void initializeNewPokedexUI();
+PocketMageGraphics& getGraphicsAdapter();
+SpriteCache& getSpriteCache();
+std::vector<DexMon>& getPokemonData();
+DexState& getDexStateRef();
+
+// New drawing functions
+void drawNewPokemonList();
+void drawNewPokemonDetail();
+void drawNewSearchScreen();
+void handleNewPokedexNavigation(char key);
+DexView getCurrentDexView();
+const DexState& getDexState();
+
 // App state
 std::vector<Pokemon> pokemonList;
 std::vector<uint16_t> searchResults;
@@ -57,7 +74,10 @@ void POKEDEX_INIT() {
     loadPokemonData();
   }
   
-  // Initialize search with all Pokemon
+  // Initialize the new UI system
+  initializeNewPokedexUI();
+  
+  // Initialize search with all Pokemon (legacy system)
   searchQuery = "";
   rebuildSearch();
   currentIndex = 0;
@@ -413,99 +433,93 @@ void processKB_POKEDEX() {
 
   int currentMillis = millis();
   if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {
-    char inchar = updateKeypress();
+    KeyEvent keyEvent = updateKeypressUTF8();
     
-    switch (CurrentPokedexState) {
-      case POKE_LIST:
-        if (inchar == 0); // No input
-        else if (inchar == 12 || inchar == 27) { // HOME or ESC - Home
-          CurrentAppState = HOME;
-          newState = true;
-          CurrentKBState = NORMAL;
-        }
-        else if (inchar == 19) { // UP
-          if (currentIndex > 0) {
-            currentIndex--;
-            if (currentIndex < listTop) {
-              listTop = currentIndex;
-            }
-            newState = true;
+    // Use new navigation system
+    if (keyEvent.hasEvent) {
+      std::cout << "[POKEDEX] Key event: action=" << (int)keyEvent.action << " text='" << keyEvent.text.c_str() << "'" << std::endl;
+      
+      // Convert KeyEvent to char for navigation handler
+      char navKey = 0;
+      switch (keyEvent.action) {
+        case KA_UP: navKey = 19; break;
+        case KA_DOWN: navKey = 21; break;
+        case KA_LEFT: navKey = 20; break;
+        case KA_RIGHT: navKey = 18; break;
+        case KA_ENTER: navKey = 13; break;
+        case KA_BACKSPACE: navKey = 8; break;
+        case KA_ESC: navKey = 27; break;
+        case KA_HOME: navKey = 12; break;
+        case KA_CHAR:
+          if (keyEvent.text.length() > 0) {
+            navKey = keyEvent.text.c_str()[0];
           }
-        }
-        else if (inchar == 21) { // DOWN
-          if (currentIndex + 1 < searchResults.size()) {
-            currentIndex++;
-            if (currentIndex >= listTop + 8) {
-              listTop = currentIndex - 7;
-            }
-            newState = true;
-          }
-        }
-        else if (inchar == 13) { // ENTER - View details
-          if (searchResults.size() > 0) {
-            CurrentPokedexState = POKE_DETAIL;
-            newState = true;
-            doFull = true;
-          }
-        }
-        else if (inchar == 8) { // BACKSPACE - Search
-          CurrentPokedexState = POKE_SEARCH;
-          newState = true;
-        }
-        break;
+          break;
+        default: break;
+      }
+      
+      if (navKey != 0) {
+        std::cout << "[POKEDEX] Converted to nav key: " << (int)navKey << std::endl;
+        handleNewPokedexNavigation(navKey);
+        newState = true;
+      }
+      
+      // Handle HOME/ESC to exit
+      if (keyEvent.action == KA_HOME || keyEvent.action == KA_ESC) {
+        // Clear both displays before exiting
+        display.fillScreen(GxEPD_WHITE);
+        refresh();
         
-      case POKE_DETAIL:
-        if (inchar == 0); // No input
-        else if (inchar == 8 || inchar == 12 || inchar == 27) { // BACKSPACE, HOME, or ESC - Back to list
-          CurrentPokedexState = POKE_LIST;
-          newState = true;
-          doFull = true;
-        }
-        else if (inchar == 20) { // LEFT
-          if (currentIndex > 0) {
-            currentIndex--;
-            newState = true;
-            doFull = true;
-          }
-        }
-        else if (inchar == 22) { // RIGHT
-          if (currentIndex + 1 < searchResults.size()) {
-            currentIndex++;
-            newState = true;
-            doFull = true;
-          }
-        }
-        break;
+        u8g2.clearBuffer();
+        u8g2.sendBuffer();
         
-      case POKE_SEARCH:
-        if (inchar == 0); // No input
-        else if (inchar == 13 || inchar == 27) { // ENTER or ESC - Back to list
-          CurrentPokedexState = POKE_LIST;
-          newState = true;
-          doFull = true;
-        }
-        else if (inchar == 8) { // BACKSPACE
-          if (searchQuery.length() > 0) {
-            searchQuery.remove(searchQuery.length() - 1);
-            rebuildSearch();
-          } else {
-            CurrentPokedexState = POKE_LIST;
-            newState = true;
-            doFull = true;
-          }
-        }
-        else if (inchar >= 32 && inchar <= 126) { // Printable characters
-          searchQuery += (char)inchar;
-          rebuildSearch();
-        }
-        break;
+        CurrentAppState = HOME;
+        newState = true;
+        doFull = true;  // Force full refresh on next draw
+        CurrentKBState = NORMAL;
+      }
     }
     
-    // Update OLED
-    currentMillis = millis();
-    if (currentMillis - OLEDFPSMillis >= (1000/60)) {
-      OLEDFPSMillis = currentMillis;
-      updatePokedexOLED();
+    // Update OLED only when needed to prevent Metal issues
+    static bool isRendering = false;
+    if (newState && !isRendering) {
+      currentMillis = millis();
+      if (currentMillis - OLEDFPSMillis >= 300) { // Minimum 300ms between updates
+        isRendering = true;
+        OLEDFPSMillis = currentMillis;
+        
+        // Clear screen only once
+        u8g2.clearBuffer();
+        
+        // Use new UI system based on current view
+        DexView currentView = getDexStateRef().view;
+        switch (currentView) {
+          case DexView::List:
+            drawNewPokemonList();
+            break;
+          case DexView::Detail:
+            drawNewPokemonDetail();
+            break;
+          case DexView::Search:
+            drawNewSearchScreen();
+            break;
+          default:
+            drawNewPokemonList();
+            break;
+        }
+        
+        // Display buffer with error handling - skip to prevent double commit
+        // The E-Ink handler will handle the actual display update
+        // try {
+        //   u8g2.sendBuffer();
+        //   delay(5); // Ensure command buffer completion
+        // } catch (...) {
+        //   // Ignore Metal errors to prevent crashes
+        // }
+        
+        newState = false;
+        isRendering = false;
+      }
     }
     
     KBBounceMillis = currentMillis;
@@ -514,205 +528,59 @@ void processKB_POKEDEX() {
 
 void einkHandler_POKEDEX() {
   static bool rendering = false;
+  static unsigned long lastEinkUpdate = 0;
+  static DexView lastView = DexView::List;
+  static int lastSelected = -1;
+  unsigned long now = millis();
   
-  if (newState && !rendering) {
-    rendering = true;
-    std::cout << "[POKEDEX] einkHandler_POKEDEX() called - state=" << CurrentPokedexState << std::endl;
+  // Prevent concurrent rendering and limit update frequency
+  if (rendering || now - lastEinkUpdate < 1000) return;
+  
+  rendering = true;
+  lastEinkUpdate = now;
+  
+  try {
+    DexView currentView = getCurrentDexView();
+    DexState& state = getDexStateRef();
     
-    switch (CurrentPokedexState) {
-      case POKE_LIST:
-        drawPokemonList();
-        break;
-      case POKE_DETAIL:
-        if (searchResults.size() > 0 && currentIndex < searchResults.size()) {
-          drawPokemonDetail(searchResults[currentIndex]);
-        }
-        break;
-      case POKE_SEARCH:
-        drawSearchScreen();
-        break;
+    // Only redraw if something actually changed
+    bool needsRedraw = (currentView != lastView) || (state.selected != lastSelected) || newState;
+    
+    if (needsRedraw) {
+      std::cout << "[POKEDEX] einkHandler_POKEDEX() - redrawing due to changes" << std::endl;
+      
+      switch (currentView) {
+        case DexView::List:
+          drawNewPokemonList();
+          break;
+        case DexView::Detail:
+          drawNewPokemonDetail();
+          break;
+        case DexView::Search:
+          drawNewSearchScreen();
+          break;
+        case DexView::Compare:
+          drawNewPokemonDetail(); // Fallback to detail for now
+          break;
+      }
+      
+      // Only call refresh if we actually drew something
+      refresh();
+      
+      // Update tracking variables
+      lastView = currentView;
+      lastSelected = state.selected;
+      newState = false;
+      doFull = false;
+      
+      // Minimal delay to prevent encoder issues
+      delay(5);
     }
-    
-    refresh();
-    newState = false;
-    doFull = false;
-    rendering = false;
-  }
-}
-
-void drawPokemonList() {
-  std::cout << "[POKEDEX] Drawing Pokemon list" << std::endl;
-  
-  display.fillScreen(GxEPD_WHITE);
-  display.setFont(&FreeMonoBold9pt7b);
-  
-  // Title
-  display.setCursor(10, 20);
-  display.print("Pokedex");
-  
-  // Draw list items
-  int y = 45;
-  int itemsShown = 0;
-  const int maxItems = 8;
-  
-  for (size_t i = listTop; i < searchResults.size() && itemsShown < maxItems; i++, itemsShown++) {
-    Pokemon* pokemon = findPokemonById(searchResults[i]);
-    if (!pokemon) continue;
-    
-    // Draw Pokemon entry first to get proper positioning
-    display.setCursor(10, y);
-    
-    // Highlight current selection - draw rectangle to cover full text height
-    if (i == currentIndex) {
-      display.fillRect(5, y - 16, display.width() - 10, 20, GxEPD_BLACK);
-      display.setTextColor(GxEPD_WHITE);
-    } else {
-      display.setTextColor(GxEPD_BLACK);
-    }
-    
-    // Reset cursor after drawing rectangle
-    display.setCursor(10, y);
-    String entry = "#" + String(pokemon->id);
-    if (pokemon->id < 10) entry = "#00" + String(pokemon->id);
-    else if (pokemon->id < 100) entry = "#0" + String(pokemon->id);
-    entry += "  " + pokemon->name;
-    
-    display.print(entry);
-    
-    y += 20;
+  } catch (...) {
+    // Handle any rendering errors silently
   }
   
-  // Instructions
-  display.setTextColor(GxEPD_BLACK);
-  display.setFont(&FreeSans9pt7b);
-  display.setCursor(10, display.height() - 10);
-  display.print("↑↓ Navigate  ⏎ View  ⌫ Search");
-}
-
-void drawPokemonDetail(uint16_t pokemonId) {
-  std::cout << "[POKEDEX] Drawing Pokemon detail for ID " << pokemonId << std::endl;
-  std::cout << "[POKEDEX] Current index: " << currentIndex << ", searchResults size: " << searchResults.size() << std::endl;
-  
-  Pokemon* pokemon = findPokemonById(pokemonId);
-  if (!pokemon) {
-    std::cout << "[POKEDEX] ERROR: Could not find Pokemon with ID " << pokemonId << std::endl;
-    std::cout << "[POKEDEX] Available Pokemon IDs: ";
-    for (size_t i = 0; i < std::min((size_t)10, pokemonList.size()); i++) {
-      std::cout << pokemonList[i].id << " ";
-    }
-    std::cout << std::endl;
-    return;
-  }
-  
-  display.fillScreen(GxEPD_WHITE);
-  display.setTextColor(GxEPD_BLACK);
-  
-  // Load and draw Pokemon sprite (64x64 pixels)
-  uint8_t spriteBuffer[512]; // 64*64/8 = 512 bytes for 1-bit bitmap
-  bool spriteLoaded = loadPokemonSprite(pokemon->id, spriteBuffer, sizeof(spriteBuffer));
-  
-  if (spriteLoaded) {
-    // Draw sprite in top-right corner
-    int spriteX = display.width() - 74; // 64px sprite + 10px margin
-    int spriteY = 10;
-    drawSprite(spriteX, spriteY, spriteBuffer, 64, 64);
-    
-    // Draw border around sprite
-    display.drawRect(spriteX - 1, spriteY - 1, 66, 66, GxEPD_BLACK);
-  }
-  
-  // Pokemon name and ID (adjust layout for sprite)
-  display.setFont(&FreeMonoBold9pt7b);
-  display.setCursor(10, 20);
-  String title = "#" + String(pokemon->id) + "  " + pokemon->name;
-  display.print(title);
-  
-  // Types and genus
-  display.setFont(&FreeSans9pt7b);
-  display.setCursor(10, 40);
-  display.print(pokemon->types);
-  
-  display.setCursor(10, 58);
-  display.print(pokemon->genus);
-  
-  // Physical stats
-  display.setCursor(10, 80);
-  String physicalStats = "Height: " + String((int)(pokemon->height_cm / 10.0)) + "m";
-  physicalStats += "  Weight: " + String((int)(pokemon->weight_hg / 10.0)) + "kg";
-  display.print(physicalStats);
-  
-  // Base stats
-  display.setFont(&FreeSans9pt7b);
-  const char* statNames[] = {"HP", "ATK", "DEF", "SpA", "SpD", "SPE"};
-  int statY = 105;
-  
-  for (int i = 0; i < 6; i++) {
-    display.setCursor(10, statY);
-    display.print(statNames[i]);
-    display.print(": ");
-    display.print(pokemon->stats[i]);
-    
-    // Draw stat bar
-    int barWidth = (pokemon->stats[i] * 80) / 150; // Scale to max 80px
-    display.fillRect(60, statY - 8, barWidth, 8, GxEPD_BLACK);
-    display.drawRect(60, statY - 8, 80, 8, GxEPD_BLACK);
-    
-    statY += 15;
-  }
-  
-  // Flavor text (description)
-  display.setFont(&FreeSans9pt7b);
-  int textY = 210;
-  String flavorText = pokemon->flavor_text;
-  
-  // Simple word wrapping
-  int lineWidth = 0;
-  int maxWidth = 280;
-  String currentLine = "";
-  
-  for (int i = 0; i < flavorText.length(); i++) {
-    char c = flavorText[i];
-    currentLine += c;
-    lineWidth += 8; // Approximate character width
-    
-    if (c == ' ' && lineWidth > maxWidth) {
-      display.setCursor(10, textY);
-      display.print(currentLine);
-      textY += 16;
-      currentLine = "";
-      lineWidth = 0;
-      if (textY > 250) break; // Don't overflow
-    }
-  }
-  
-  if (currentLine.length() > 0 && textY <= 250) {
-    display.setCursor(10, textY);
-    display.print(currentLine);
-  }
-  
-  // Instructions
-  display.setFont(&FreeSans9pt7b);
-  display.setCursor(10, display.height() - 10);
-  display.print("← → Navigate  ⌫ Back");
-}
-
-void drawSearchScreen() {
-  display.fillScreen(GxEPD_WHITE);
-  display.setTextColor(GxEPD_BLACK);
-  display.setFont(&FreeMonoBold9pt7b);
-  
-  display.setCursor(10, 30);
-  display.print("Search Pokemon");
-  
-  display.setFont(&FreeSans9pt7b);
-  display.setCursor(10, 60);
-  display.print("Query: " + searchQuery);
-  
-  display.setCursor(10, 90);
-  display.print("Found: " + String((int)searchResults.size()) + " matches");
-  
-  display.setCursor(10, display.height() - 10);
-  display.print("Type to search  ⏎ View results");
+  rendering = false;
 }
 
 void updatePokedexOLED() {
@@ -720,51 +588,104 @@ void updatePokedexOLED() {
   return;
   
   u8g2.clearBuffer();
-  // u8g2.setFont(u8g2_font_5x7_mf); // Font not available in emulator
   
-  switch (CurrentPokedexState) {
-    case POKE_LIST: {
+  const DexState& state = getDexStateRef();
+  
+  switch (state.view) {
+    case DexView::List: {
       u8g2.setCursor(0, 8);
       u8g2.print("Pokedex");
       u8g2.setCursor(0, 18);
       u8g2.print("Found: ");
-      // Safe conversion to avoid potential issues with size_t
-      int resultCount = static_cast<int>(searchResults.size());
-      u8g2.print(resultCount);
+      u8g2.print(static_cast<int>(state.filteredIndex.size()));
       u8g2.setCursor(0, 28);
-      if (resultCount > 0) {
-        u8g2.print((currentIndex + 1));
+      if (!state.filteredIndex.empty()) {
+        u8g2.print((state.selected + 1));
         u8g2.print("/");
-        u8g2.print(resultCount);
+        u8g2.print(static_cast<int>(state.filteredIndex.size()));
       }
       break;
     }
       
-    case POKE_DETAIL:
-      if (searchResults.size() > 0 && currentIndex < searchResults.size()) {
-        Pokemon* pokemon = findPokemonById(searchResults[currentIndex]);
-        if (pokemon) {
-          u8g2.setCursor(0, 8);
-          u8g2.print("#");
-          u8g2.print(pokemon->id);
-          u8g2.setCursor(0, 18);
-          u8g2.print(pokemon->name.c_str());
-          u8g2.setCursor(0, 28);
-          u8g2.print(pokemon->types.c_str());
-        }
+    case DexView::Detail:
+      if (!state.filteredIndex.empty() && state.selected < (int)state.filteredIndex.size()) {
+        u8g2.setCursor(0, 8);
+        u8g2.print("Detail View");
+        u8g2.setCursor(0, 18);
+        u8g2.print("Pokemon #");
+        u8g2.print(state.selected + 1);
+        u8g2.setCursor(0, 28);
+        const char* tabNames[] = {"Info", "Stats", "Moves", "Evo", "Loc"};
+        u8g2.print(tabNames[(int)state.tab]);
       }
       break;
       
-    case POKE_SEARCH:
+    case DexView::Search:
       u8g2.setCursor(0, 8);
       u8g2.print("Search Mode");
       u8g2.setCursor(0, 18);
-      u8g2.print(searchQuery.c_str());
+      u8g2.print(state.filters.query.c_str());
       u8g2.setCursor(0, 28);
       u8g2.print("Matches: ");
-      u8g2.print(static_cast<unsigned int>(searchResults.size()));
+      u8g2.print(static_cast<int>(state.filteredIndex.size()));
+      break;
+      
+    case DexView::Compare:
+      u8g2.setCursor(0, 8);
+      u8g2.print("Compare Mode");
       break;
   }
   
   u8g2.sendBuffer();
+}
+
+// New drawing functions that use the graphics adapter
+void drawNewPokemonList() {
+  display.fillScreen(GxEPD_WHITE);
+  IGraphics& gfx = getGraphicsAdapter();
+  PokedexUI::drawPokemonGrid(gfx, getDexStateRef(), getPokemonData(), getSpriteCache());
+}
+
+void drawNewPokemonDetail() {
+  display.fillScreen(GxEPD_WHITE);
+  IGraphics& gfx = getGraphicsAdapter();
+  PokedexUI::drawPokemonDetail(gfx, getDexStateRef(), getPokemonData(), getSpriteCache());
+}
+
+void drawNewSearchScreen() {
+  display.fillScreen(GxEPD_WHITE);
+  IGraphics& gfx = getGraphicsAdapter();
+  PokedexUI::drawSearchScreen(gfx, getDexStateRef());
+}
+
+// Handle navigation with new system
+void handleNewPokedexNavigation(char key) {
+  PokedexUI::handleNavigation(getDexStateRef(), key, getPokemonData());
+  
+  // Preload adjacent sprites for smooth navigation
+  DexState& state = getDexStateRef();
+  if (!state.filteredIndex.empty() && state.selected < (int)state.filteredIndex.size()) {
+    uint16_t currentId = getPokemonData()[state.filteredIndex[state.selected]].id;
+    getSpriteCache().preload(currentId);
+    
+    // Preload previous and next
+    if (state.selected > 0) {
+      uint16_t prevId = getPokemonData()[state.filteredIndex[state.selected - 1]].id;
+      getSpriteCache().preload(prevId);
+    }
+    if (state.selected + 1 < (int)state.filteredIndex.size()) {
+      uint16_t nextId = getPokemonData()[state.filteredIndex[state.selected + 1]].id;
+      getSpriteCache().preload(nextId);
+    }
+  }
+}
+
+// Get current view for the main loop
+DexView getCurrentDexView() {
+  return getDexStateRef().view;
+}
+
+// Export the state for external access
+const DexState& getDexState() {
+  return getDexStateRef();
 }
