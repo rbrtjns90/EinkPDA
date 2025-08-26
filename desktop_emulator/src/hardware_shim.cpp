@@ -15,28 +15,25 @@
 // Access to global display instance
 extern DesktopDisplay* g_display;
 
+<<<<<<< HEAD
 // TXT app variables are defined in globals.cpp
 
 // AppState enum is now defined in globals.h
+=======
+// Include AppState enum definition
+enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
+>>>>>>> bf09540c415541c77365cbb1c35d957b8eef657c
 #include "GxEPD2_BW.h"
 #include "U8g2lib.h"
 #include "Buzzer.h"
 #include "USB.h"
 
-// Arduino compatibility implementations - duplicates removed
 SerialClass Serial;
 // rtc, u8g2, keypad are defined in real PocketMage globals.cpp
 SD_MMCClass SD_MMC;
 TwoWire Wire;
 SPIClass SPI;
-// cap and prefs are defined in real PocketMage globals.cpp
-
-// NOTE:
-// The real PocketMage globals (display, u8g2, rtc, keypad, buzzer, prefs, etc.)
-// are defined in Code/PocketMage_V3/src/globals.cpp and declared in
-// Code/PocketMage_V3/include/globals.h. We must NOT define them here to avoid
-// duplicate symbol linker errors.
-
+=
 unsigned long millis() {
     static auto start = std::chrono::steady_clock::now();
     auto now = std::chrono::steady_clock::now();
@@ -138,7 +135,6 @@ int digitalPinToInterrupt(uint8_t pin) {
     return pin; // Simple mapping for emulator
 }
 
-// Function signature compatibility removed - using real app implementation
 
 // Only USB_INIT is missing from real PocketMage source
 void USB_INIT() {
@@ -158,7 +154,6 @@ void oledWord(const char* text, bool clear, bool send) {
     if (send && g_display) g_display->oledUpdate();
 }
 
-// Duplicate functions removed - implemented in real PocketMage source
 
 // PocketMage configuration constants - duplicates removed, defined in real PocketMage globals.cpp
 // Configuration variables are now defined as macros in config.h
@@ -173,10 +168,6 @@ long random(long min, long max) {
     return min + (rand() % (max - min));
 }
 
-// MockSerial implementation
-// SerialClass methods are implemented in the class definition
-
-// String implementation removed - using std::string directly
 
 // File implementation
 File::File() : inFile(nullptr), outFile(nullptr), isOpen(false), isDir(false), dirIndex(0) {}
@@ -370,11 +361,6 @@ bool File::println(const String& msg) {
     return println(msg.c_str());
 }
 
-// SD_MMC implementation methods are in SD_MMC.h
-
-// Hardware implementations are now in their respective header files
-
-// All mock implementations are now in their respective header files
 
 // Mock GPIO and system functions
 void pinMode(uint8_t pin, uint8_t mode) {}

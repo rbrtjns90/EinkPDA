@@ -1,9 +1,3 @@
-//  oooooooo  ooooooooo  oooo   oooo ooooooooooo ooooooooo   ooooooooooo ooooooo  ooooo
-//  888    888 888    888 888  o  888 888         888    888  888         888   888  888  
-//  888oooo88  888oooo88  888 888 888 888ooooo    888    888  888ooooo     888    888888   
-//  888        888    888 888888888  888         888    888  888          888   888  888  
-// o888o      o888ooo888  888   o888 ooooooooooo ooooooooo  ooooooooooo  o888o o888o o888o
-
 #include "globals.h"
 #include "PokedexUI.h"
 #include "PocketMageGraphics.h"
