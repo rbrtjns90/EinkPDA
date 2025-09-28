@@ -1,5 +1,6 @@
 #include "pocketmage_compat.h"
 #include "desktop_display_sdl2.h"
+#include "oled_service.h"
 #include "globals.h"
 #include <iostream>
 #include <fstream>
@@ -15,14 +16,9 @@
 // Access to global display instance
 extern DesktopDisplay* g_display;
 
-<<<<<<< HEAD
 // TXT app variables are defined in globals.cpp
 
 // AppState enum is now defined in globals.h
-=======
-// Include AppState enum definition
-enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
->>>>>>> bf09540c415541c77365cbb1c35d957b8eef657c
 #include "GxEPD2_BW.h"
 #include "U8g2lib.h"
 #include "Buzzer.h"
@@ -33,7 +29,7 @@ SerialClass Serial;
 SD_MMCClass SD_MMC;
 TwoWire Wire;
 SPIClass SPI;
-=
+
 unsigned long millis() {
     static auto start = std::chrono::steady_clock::now();
     auto now = std::chrono::steady_clock::now();
@@ -65,19 +61,11 @@ uint32_t esp_random() {
 // PocketMage compatibility functions - removeChar is defined in real PocketMage source
 
 void oledWord(const String& text) {
-    if (g_display) {
-        g_display->oledClear();
-        g_display->oledDrawText(text.c_str(), 0, 16);
-        g_display->oledUpdate();
-    }
+    oled_set_lines(text.c_str(), "", "");
 }
 
-void oledLine(const String& text, bool clear) {
-    if (g_display) {
-        if (clear) g_display->oledClear();
-        g_display->oledDrawText(text.c_str(), 0, 16);
-        g_display->oledUpdate();
-    }
+void oledLine(const String& text, bool /*clear*/) {
+    oled_set_lines(text.c_str(), "", "");
 }
 
 void refresh() {
@@ -146,12 +134,8 @@ void playJingle(const char* name) {
     std::cout << "[Audio] Playing jingle: " << name << std::endl;
 }
 
-void oledWord(const char* text, bool clear, bool send) {
-    if (clear && g_display) g_display->oledClear();
-    if (text && g_display) {
-        g_display->oledDrawText(text, 0, 0, 8);
-    }
-    if (send && g_display) g_display->oledUpdate();
+void oledWord(const char* text, bool /*clear*/, bool /*send*/) {
+    oled_set_lines(text ? text : "", "", "");
 }
 
 
@@ -513,11 +497,7 @@ void cycleKeyboardLayout() {
     
     // For emulator, just update the current layout name and show message
     CurrentLayoutName = nextLayout;
-    if (g_display) {
-        g_display->oledClear();
-        g_display->oledDrawText(("Keyboard: " + nextLayout).c_str(), 0, 16);
-        g_display->oledUpdate();
-    }
+    oled_set_lines(("Keyboard: " + nextLayout).c_str(), "", "");
     std::cout << "[KEYBOARD] Switched to layout: " << nextLayout.c_str() << std::endl;
 }
 
@@ -832,27 +812,14 @@ void listDir(SD_MMCClass& fs, const char* dirname) {
 }
 
 void oledLine(String text, bool center, String prefix) {
-    if (g_display) {
-        String fullText = prefix + ": " + text;
-        g_display->oledDrawText(fullText.c_str(), center ? 64 : 0, 16, 8);
-        g_display->oledUpdate();
-    }
+    String fullText = prefix + ": " + text;
+    oled_set_lines(fullText.c_str(), "", "");
 }
 
 void oledWord(String text, bool center, bool newline) {
-    if (g_display) {
-        static int oled_y = 0;
-        g_display->oledDrawText(text.c_str(), center ? 64 : 0, oled_y, 8);
-        if (newline) oled_y += 8;
-        if (oled_y >= 32) oled_y = 0;
-        g_display->oledUpdate();
-    }
+    oled_set_lines(text.c_str(), "", "");
 }
 
 void statusBar(String text, bool refresh) {
-    if (g_display) {
-        // Draw status bar at bottom of OLED display
-        g_display->oledDrawText(text.c_str(), 0, 24, 8);
-        if (refresh) g_display->oledUpdate();
-    }
+    oled_set_lines("", "", text.c_str());
 }

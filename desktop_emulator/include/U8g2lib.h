@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "desktop_display.h"
+#include "desktop_display_sdl2.h"
 #include "oled_service.h"
 #include "pocketmage_compat.h"
 

@@ -131,6 +131,8 @@ namespace StatChart {
 
 // Main UI Functions
 namespace PokedexUI {
+  struct Rect { int x, y, w, h; };
+
   void drawBreadcrumb(IGraphics& gfx, const DexState& state);
   void drawPokemonGrid(IGraphics& gfx, const DexState& state, const std::vector<DexMon>& mons, SpriteCache& cache);
   void drawPokemonDetail(IGraphics& gfx, const DexState& state, const std::vector<DexMon>& mons, SpriteCache& cache);
@@ -140,4 +142,15 @@ namespace PokedexUI {
   void refreshFilterAndSort(DexState& state, const std::vector<DexMon>& mons);
   void handleNavigation(DexState& state, char key, const std::vector<DexMon>& mons);
   void clampSelection(DexState& state);
+
+  // Returns on-screen cell rectangle for list index i; returns false if not visible
+  bool gridCellRectForIndex(IGraphics& gfx, const DexState& state, int i, Rect& out);
+
+  // Repaint only the cell you left and the cell you entered.
+  // prevSelected = -1 means "no previous" (will paint only current).
+  void updateListSelection(IGraphics& gfx,
+                           DexState& state,
+                           const std::vector<DexMon>& mons,
+                           SpriteCache& cache,
+                           int prevSelected);
 }

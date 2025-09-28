@@ -1,13 +1,14 @@
 #include "oled_service.h"
-#include "U8g2lib.h"
+#include "desktop_display_sdl2.h"
 #include "pocketmage_compat.h"
-#include <iostream>
+#include "U8g2lib.h"
 #include <cstring>
+#include <iostream>
 
-// Static member definition
+extern DesktopDisplay* g_display;
+
+// Static member definition for U8g2 compatibility
 std::string U8G2_SH1106_128X32_VISIONOX_F_HW_I2C::textLines[3];
-
-extern U8G2_SH1106_128X32_VISIONOX_F_HW_I2C u8g2;
 
 OledService& OledService::getInstance() {
     static OledService instance;
@@ -43,10 +44,8 @@ void OledService::presentIfDirty() {
         state_.dirty = false;
     }
     
-    // Actually render the OLED display
-    if (g_display) {
-        g_display->renderOledText(line1, line2, line3);
-    }
+    // Render on main thread only (g_display is owned by main)
+    if (g_display) g_display->renderOledText(line1, line2, line3);
     
     inPresent_.store(false);
 }

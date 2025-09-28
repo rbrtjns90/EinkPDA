@@ -5,7 +5,27 @@
 #include <cstring>
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <chrono>
+
+// --- E-Ink simulation config/state -----------------------------------------
+namespace {
+    struct EInkSimConfig {
+        bool  enabled          = false; // runtime toggle; F5
+        bool  flash_full       = true;  // white/black flashes on full refresh
+        bool  flash_partial    = false; // real panels usually don't flash on partial
+        int   full_ms          = 0;     // No delays to avoid Metal issues
+        int   partial_ms       = 0;     // No delays to avoid Metal issues
+        float ghosting_full    = 0.02f; // faint retention after full
+        float ghosting_partial = 0.08f; // stronger retention on partial
+        float full_threshold   = 0.22f; // >22% pixels changed ⇒ full refresh
+        int   wipe_step_px     = 18;    // stripe width for partial wipe
+        int   diff_threshold   = 24;    // 0..255; change threshold to count as "dirty"
+    };
+    static EInkSimConfig g_einkSimCfg;
+    static bool g_einkSimEnabled = false;
+    static bool g_einkSimForceFull = false;
+}
 
 // Global instance
 DesktopDisplay* g_display = nullptr;
@@ -15,6 +35,12 @@ DesktopDisplay::DesktopDisplay()
       einkTexture(nullptr), oledTexture(nullptr), font(nullptr), smallFont(nullptr),
       lastKey(0), hasUTF8InputData(false) {
     memset(keyPressed, false, sizeof(keyPressed));
+    
+    const char* _einkSim = std::getenv("POCKETMAGE_EINK_SIM");
+    if (_einkSim && _einkSim[0] && _einkSim[0] != '0') {
+        g_einkSimEnabled = true;
+        std::cout << "[EINK SIM] Enabled via POCKETMAGE_EINK_SIM" << std::endl;
+    }
 }
 
 DesktopDisplay::~DesktopDisplay() {
@@ -24,40 +50,11 @@ DesktopDisplay::~DesktopDisplay() {
 bool DesktopDisplay::init() {
     DEBUG_LOG("SDL2", "Initializing DesktopDisplay...");
     
-    // COMPLETE Metal disabling - set environment variables before SDL init
-    setenv("SDL_RENDER_DRIVER", "software", 1);
-    setenv("SDL_VIDEODRIVER", "cocoa", 1);
-    setenv("SDL_RENDER_SCALE_QUALITY", "0", 1);
-    setenv("SDL_VIDEO_MAC_FULLSCREEN_SPACES", "0", 1);
-    setenv("SDL_RENDER_BATCHING", "0", 1);
-    setenv("SDL_VIDEO_EXTERNAL_CONTEXT", "0", 1);
-    setenv("SDL_RENDER_OPENGL_SHADERS", "0", 1);
-    setenv("SDL_VIDEO_HIGHDPI_DISABLED", "1", 1);
-    setenv("SDL_RENDER_VSYNC", "0", 1);
-    setenv("SDL_METAL_PREFER_LOW_POWER_DEVICE", "0", 1);
-    
-    // Disable Metal completely at system level
-    setenv("METAL_DEVICE_WRAPPER_TYPE", "1", 1);
-    setenv("METAL_DEBUG_ERROR_MODE", "0", 1);
-    setenv("MTL_DEBUG_LAYER", "0", 1);
-    setenv("MTL_SHADER_VALIDATION", "0", 1);
-    setenv("CA_METAL_LAYER_ENABLED", "0", 1);
-    
-    // Force X11-style software rendering
-    setenv("SDL_VIDEO_X11_FORCE_EGL", "0", 1);
-    setenv("SDL_VIDEO_ALLOW_SCREENSAVER", "1", 1);
-    
-    // Force software rendering and disable Metal completely
+    // Use basic software rendering without extreme restrictions
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
-    SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, "0");
-    SDL_SetHint(SDL_HINT_RENDER_BATCHING, "0");
-    SDL_SetHint(SDL_HINT_VIDEO_EXTERNAL_CONTEXT, "0");
-    SDL_SetHint(SDL_HINT_RENDER_OPENGL_SHADERS, "0");
     SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1");
-    SDL_SetHint("SDL_VIDEODRIVER", "cocoa");
     SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
-    SDL_SetHint("SDL_METAL_PREFER_LOW_POWER_DEVICE", "0");
     
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         std::cerr << "[SDL2] SDL_Init failed: " << SDL_GetError() << std::endl;
@@ -77,7 +74,7 @@ bool DesktopDisplay::init() {
     // Create E-Ink window
     einkWindow = SDL_CreateWindow("PocketMage E-Ink Display",
                                   SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                                  EINK_WIDTH * SCALE_FACTOR, EINK_HEIGHT * SCALE_FACTOR,
+                                  EINK_WIDTH * EINK_WINDOW_SCALE, EINK_HEIGHT * EINK_WINDOW_SCALE,
                                   SDL_WINDOW_SHOWN);
     if (!einkWindow) {
         std::cerr << "[SDL2] Failed to create E-Ink window: " << SDL_GetError() << std::endl;
@@ -85,31 +82,28 @@ bool DesktopDisplay::init() {
         return false;
     }
 
-    // Create renderer with explicit software flag and no acceleration
+    // Create software renderer only - no hardware acceleration
     einkRenderer = SDL_CreateRenderer(einkWindow, -1, SDL_RENDERER_SOFTWARE);
     if (!einkRenderer) {
-        std::cerr << "[SDL2] Failed to create E-Ink renderer: " << SDL_GetError() << std::endl;
+        std::cerr << "[SDL2] Failed to create E-Ink software renderer: " << SDL_GetError() << std::endl;
         cleanup();
         return false;
     }
     
-    // Verify we got software renderer
+    // Check what renderer we got
     SDL_RendererInfo info;
     if (SDL_GetRendererInfo(einkRenderer, &info) == 0) {
         std::cout << "[SDL2] E-Ink renderer: " << info.name << " (flags: " << info.flags << ")" << std::endl;
-        if (!(info.flags & SDL_RENDERER_SOFTWARE)) {
-            std::cerr << "[SDL2] WARNING: E-Ink renderer is not software!" << std::endl;
-        }
     }
     
-    // Set viewport immediately after creating renderer
-    SDL_Rect einkViewport = {0, 0, EINK_WIDTH * 3, EINK_HEIGHT * 3};
-    SDL_RenderSetViewport(einkRenderer, &einkViewport);
+    // Use logical size + integer scaling (resizes cleanly, no per-frame viewport churn)
+    SDL_RenderSetLogicalSize(einkRenderer, EINK_WIDTH, EINK_HEIGHT);
+    SDL_RenderSetIntegerScale(einkRenderer, SDL_TRUE);
 
     // Create OLED window
     oledWindow = SDL_CreateWindow("PocketMage OLED Display",
-                                  SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED + (EINK_HEIGHT * SCALE_FACTOR) + 50,
-                                  OLED_WIDTH * SCALE_FACTOR, OLED_HEIGHT * SCALE_FACTOR,
+                                  SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED + (EINK_HEIGHT * EINK_WINDOW_SCALE) + 50,
+                                  OLED_WIDTH * OLED_WINDOW_SCALE, OLED_HEIGHT * OLED_WINDOW_SCALE,
                                   SDL_WINDOW_SHOWN);
     if (!oledWindow) {
         std::cerr << "[SDL2] Failed to create OLED window: " << SDL_GetError() << std::endl;
@@ -117,28 +111,25 @@ bool DesktopDisplay::init() {
         return false;
     }
 
-    // Create renderer with explicit software flag and no acceleration
+    // Create software renderer only - no hardware acceleration
     oledRenderer = SDL_CreateRenderer(oledWindow, -1, SDL_RENDERER_SOFTWARE);
     if (!oledRenderer) {
-        std::cerr << "[SDL2] Failed to create OLED renderer: " << SDL_GetError() << std::endl;
+        std::cerr << "[SDL2] Failed to create OLED software renderer: " << SDL_GetError() << std::endl;
         cleanup();
         return false;
     }
     
-    // Verify we got software renderer
+    // Check what renderer we got
     SDL_RendererInfo oledInfo;
     if (SDL_GetRendererInfo(oledRenderer, &oledInfo) == 0) {
         std::cout << "[SDL2] OLED renderer: " << oledInfo.name << " (flags: " << oledInfo.flags << ")" << std::endl;
-        if (!(oledInfo.flags & SDL_RENDERER_SOFTWARE)) {
-            std::cerr << "[SDL2] WARNING: OLED renderer is not software!" << std::endl;
-        }
     }
     
-    // Set viewport immediately after creating renderer
-    SDL_Rect oledViewport = {0, 0, OLED_WIDTH * 3, OLED_HEIGHT * 3};
-    SDL_RenderSetViewport(oledRenderer, &oledViewport);
+    // Use logical size (safer than per-frame viewports) for 128x32 OLED
+    SDL_RenderSetLogicalSize(oledRenderer, OLED_WIDTH, OLED_HEIGHT);
+    SDL_RenderSetIntegerScale(oledRenderer, SDL_TRUE);
 
-    // Create textures - try ARGB8888 format instead
+    // Create textures with ARGB8888 format for software rendering
     einkTexture = SDL_CreateTexture(einkRenderer, SDL_PIXELFORMAT_ARGB8888, 
                                     SDL_TEXTUREACCESS_STREAMING, EINK_WIDTH, EINK_HEIGHT);
     if (!einkTexture) {
@@ -156,8 +147,8 @@ bool DesktopDisplay::init() {
     }
 
     // Initialize framebuffers
-    einkBuffer.resize(EINK_WIDTH * EINK_HEIGHT, 255); // White background for E-Ink
-    oledBuffer.resize(OLED_WIDTH * OLED_HEIGHT, 0);   // Black background for OLED
+    einkBuffer.assign(EINK_WIDTH * EINK_HEIGHT, 255); // White background for E‑Ink
+    oledBuffer.assign(OLED_WIDTH * OLED_HEIGHT, 0);   // Black background for OLED
 
     // Load fonts
     const char* fontPaths[] = {
@@ -237,7 +228,7 @@ void DesktopDisplay::cleanup() {
 // E-Ink display methods
 void DesktopDisplay::einkClear() {
     std::fill(einkBuffer.begin(), einkBuffer.end(), 255);
-    DEBUG_LOG("SDL2", "E-Ink cleared to white");
+    // Force immediate refresh to clear artifacts when transitioning between apps
     updateEinkTexture();
 }
 
@@ -304,12 +295,14 @@ void DesktopDisplay::einkDrawText(const std::string& text, int x, int y, int siz
     }
     
     SDL_UnlockSurface(textSurface);
-    SDL_FreeSurface(textSurface);
+    if (textSurface) {
+        SDL_FreeSurface(textSurface);
+        textSurface = nullptr;
+    }
     
     // std::cout << "[SDL2] E-Ink text drawn with SDL_ttf" << std::endl;
     
-    // Auto-update display after drawing text
-    updateEinkTexture();
+    // No auto-present; caller will present once per frame
 }
 
 void DesktopDisplay::einkDrawLine(int x0, int y0, int x1, int y1, bool black) {
@@ -370,8 +363,7 @@ void DesktopDisplay::einkDrawBitmap(int x, int y, const unsigned char* bitmap, i
             }
         }
     }
-    // Auto-update display after drawing bitmap
-    updateEinkTexture();
+    // No auto-present; caller will present once per frame
 }
 
 void DesktopDisplay::einkDrawCircle(int x, int y, int r, bool filled, bool black) {
@@ -420,21 +412,45 @@ void DesktopDisplay::einkGetTextBounds(const char* text, int x, int y, int16_t* 
     *h = 12; // Approximate character height
 }
 
-void DesktopDisplay::einkRefresh() {
-    DEBUG_LOG("SDL2", "E-Ink refresh - updating display");
-    updateEinkTexture();
-}
+void DesktopDisplay::einkRefresh() { updateEinkTexture(); }
 
-void DesktopDisplay::einkPartialRefresh() {
-    DEBUG_LOG("SDL2", "E-Ink partial refresh - updating display");
-    updateEinkTexture();
+void DesktopDisplay::einkPartialRefresh() { updateEinkTexture(); }
+
+void DesktopDisplay::einkForceFullRefresh() {
+    // Force a complete screen update by clearing the comparison buffer
+    if (!einkTexture || !einkRenderer) return;
+    
+    // Upload entire screen (ignore dirty detection)
+    void* pixels; int pitch;
+    if (SDL_LockTexture(einkTexture, nullptr, &pixels, &pitch) != 0) {
+        std::cerr << "[SDL2] Failed to lock E-Ink texture: " << SDL_GetError() << std::endl;
+        return;
+    }
+    auto* dst = static_cast<uint32_t*>(pixels);
+    const int stride = pitch / 4;
+    for (int y = 0; y < EINK_HEIGHT; ++y) {
+        const uint8_t* src = &einkBuffer[y * EINK_WIDTH];
+        uint32_t* out = &dst[y * stride];
+        for (int x = 0; x < EINK_WIDTH; ++x) {
+            uint8_t g = src[x];
+            out[x] = 0xFF000000u | (g << 16) | (g << 8) | g;
+        }
+    }
+    SDL_UnlockTexture(einkTexture);
+    
+    // Ensure viewport is set
+    SDL_Rect viewport = {0, 0, EINK_WIDTH, EINK_HEIGHT};
+    SDL_RenderSetViewport(einkRenderer, &viewport);
+    
+    SDL_RenderClear(einkRenderer);
+    SDL_RenderCopy(einkRenderer, einkTexture, nullptr, nullptr);
+    SDL_RenderPresent(einkRenderer);
 }
 
 // OLED display methods
 void DesktopDisplay::oledClear() {
     std::fill(oledBuffer.begin(), oledBuffer.end(), 0);
-    DEBUG_LOG("SDL2", "OLED cleared to black");
-    updateOledTexture();
+    // buffer-only; caller will present once
 }
 
 void DesktopDisplay::oledClearRect(int x, int y, int w, int h) {
@@ -450,7 +466,7 @@ void DesktopDisplay::oledClearRect(int x, int y, int w, int h) {
             }
         }
     }
-    updateOledTexture();
+    // buffer-only
 }
 
 void DesktopDisplay::oledSetPixel(int x, int y, bool on) {
@@ -463,81 +479,41 @@ void DesktopDisplay::oledSetPixel(int x, int y, bool on) {
 }
 
 void DesktopDisplay::oledDrawText(const std::string& text, int x, int y, int size) {
-    if (!font) {
-        std::cout << "[OLED] ERROR: Font not loaded!" << std::endl;
-        return;
-    }
-    
-    std::cout << "[OLED] Font loaded, rendering text: " << text << std::endl;
-    
-    // std::cout << "[SDL2] Drawing OLED text: '" << text << "' at (" << x << "," << y << ") size=" << size << std::endl;
-    
-    // Clear the text area first (estimate text width/height)
-    int estimatedWidth = text.length() * (size + 2);
-    int estimatedHeight = size + 4;
-    oledClearRect(x, y, estimatedWidth, estimatedHeight);
-    
-    if (text.empty()) return;
-    
-    // Use SDL_ttf to render text with UTF-8 encoding
-    SDL_Color textColor = {255, 255, 255, 255}; // White text
-    SDL_Color bgColor = {0, 0, 0, 255}; // Black background
-    SDL_Surface* textSurface = TTF_RenderUTF8_Shaded(font, text.c_str(), textColor, bgColor);
-    
-    if (!textSurface) {
-        std::cerr << "[SDL2] Failed to render OLED text surface: " << TTF_GetError() << std::endl;
-        return;
-    }
-    
-    std::cout << "[OLED] Text surface created: " << textSurface->w << "x" << textSurface->h << " format=" << textSurface->format->format << std::endl;
-    
-    // Convert surface to our framebuffer format and copy pixels
-    SDL_LockSurface(textSurface);
-    
-    int textWidth = textSurface->w;
-    int textHeight = textSurface->h;
-    
-    // Copy pixels from text surface to our framebuffer
-    for (int dy = 0; dy < textHeight && (y + dy) < OLED_HEIGHT; dy++) {
-        for (int dx = 0; dx < textWidth && (x + dx) < OLED_WIDTH; dx++) {
-            if (x + dx >= 0 && y + dy >= 0) {
-                // Get pixel from text surface
-                Uint8* pixelPtr = (Uint8*)textSurface->pixels + (dy * textSurface->pitch) + (dx * textSurface->format->BytesPerPixel);
-                
-                Uint8 intensity = 0;
-                if (textSurface->format->BytesPerPixel == 1) {
-                    // 8-bit grayscale
-                    intensity = *pixelPtr;
-                } else if (textSurface->format->BytesPerPixel >= 3) {
-                    // RGB format - use red component
-                    intensity = pixelPtr[0];
-                } else if (textSurface->format->BytesPerPixel == 4) {
-                    // RGBA format - use red component
-                    intensity = pixelPtr[0];
-                }
-                
-                // Write to framebuffer (0 = black, 255 = white)
-                int fbIndex = (y + dy) * OLED_WIDTH + (x + dx);
-                if (fbIndex >= 0 && fbIndex < (int)oledBuffer.size()) {
-                    // For white text on black background - only draw bright pixels
-                    if (intensity > 128) {
-                        oledBuffer[fbIndex] = 1; // Set pixel on
-                        if (dx < 5 && dy < 5) { // Debug first few pixels
-                            std::cout << "[OLED] Pixel (" << (x+dx) << "," << (y+dy) << ") intensity=" << (int)intensity << std::endl;
-                        }
-                    }
-                }
+    if (!font || text.empty()) return;
+
+    // Buffer-only: clear a conservative area for this line
+    const int estimatedWidth  = int(text.length()) * (size + 2);
+    const int estimatedHeight = size + 6;
+    oledClearRect(x, y - estimatedHeight + 2, estimatedWidth, estimatedHeight);
+
+    SDL_Color fg = {255,255,255,255};
+    SDL_Color bg = {0,0,0,255};
+    SDL_Surface* s = TTF_RenderUTF8_Shaded(font, text.c_str(), fg, bg);
+    if (!s) { std::cerr << "[OLED] TTF_RenderUTF8_Shaded failed: " << TTF_GetError() << "\n"; return; }
+
+    SDL_LockSurface(s);
+    const int bpp = s->format->BytesPerPixel;
+    for (int dy = 0; dy < s->h; ++dy) {
+        int py = y + dy - (s->h - 1);
+        if (py < 0 || py >= OLED_HEIGHT) continue;
+        for (int dx = 0; dx < s->w; ++dx) {
+            int px = x + dx;
+            if (px < 0 || px >= OLED_WIDTH) continue;
+
+            const Uint8* p = (Uint8*)s->pixels + dy * s->pitch + dx * bpp;
+            Uint8 intensity = (bpp >= 3) ? p[0] : *p;   // use R channel
+            if (intensity > 128) {
+                oledBuffer[py * OLED_WIDTH + px] = 255; // ON
             }
         }
     }
-    
-    SDL_UnlockSurface(textSurface);
-    SDL_FreeSurface(textSurface);
-    
-    // std::cout << "[SDL2] OLED text drawn with SDL_ttf" << std::endl;
-    
-    // Auto-update display after drawing text
-    updateOledTexture();
+    SDL_UnlockSurface(s);
+    if (s) {
+        SDL_FreeSurface(s);
+        s = nullptr;
+    }
+
+    // REMOVE: updateOledTexture();
 }
 
 void DesktopDisplay::oledDrawLine(int x0, int y0, int x1, int y1, bool on) {
@@ -581,10 +557,7 @@ void DesktopDisplay::oledDrawRect(int x, int y, int w, int h, bool filled, bool 
     }
 }
 
-void DesktopDisplay::oledUpdate() {
-    DEBUG_LOG("SDL2", "OLED update - updating display");
-    updateOledTexture();
-}
+void DesktopDisplay::oledUpdate() { updateOledTexture(); }
 
 // UTF-8 text input handling
 bool DesktopDisplay::handleEvents() {
@@ -611,45 +584,68 @@ bool DesktopDisplay::handleEvents() {
             switch (e.key.keysym.sym) {
                 case SDLK_UP:
                     lastKey = 19;  // ASCII 19 - UP arrow for PocketMage
-                    std::cout << "[KEYBOARD] Mapped to UP arrow" << std::endl;
+                    // std::cout << "[KEYBOARD] Mapped to UP arrow" << std::endl;
                     break;
                 case SDLK_DOWN:
                     lastKey = 21;  // ASCII 21 - DOWN arrow for PocketMage
-                    std::cout << "[KEYBOARD] Mapped to DOWN arrow" << std::endl;
+                    // std::cout << "[KEYBOARD] Mapped to DOWN arrow" << std::endl;
                     break;
                 case SDLK_LEFT:
                     lastKey = 20;  // ASCII 20 - LEFT arrow for PocketMage
-                    std::cout << "[KEYBOARD] Mapped to LEFT arrow" << std::endl;
+                    // std::cout << "[KEYBOARD] Mapped to LEFT arrow" << std::endl;
                     break;
                 case SDLK_RIGHT:
                     lastKey = 18;  // ASCII 18 - RIGHT arrow for PocketMage (matches UTF8 handler)
-                    std::cout << "[KEYBOARD] Mapped to RIGHT arrow" << std::endl;
+                    // std::cout << "[KEYBOARD] Mapped to RIGHT arrow" << std::endl;
                     break;
                 case SDLK_ESCAPE:
                     lastKey = 27;  // ASCII 27 - ESC key
-                    std::cout << "[KEYBOARD] Mapped to ESC" << std::endl;
+                    // std::cout << "[KEYBOARD] Mapped to ESC" << std::endl;
                     break;
                 case SDLK_HOME:
                     lastKey = 12;  // ASCII 12 - HOME key
-                    std::cout << "[KEYBOARD] Mapped to HOME" << std::endl;
+                    // std::cout << "[KEYBOARD] Mapped to HOME" << std::endl;
                     break;
                 case SDLK_RETURN:
                 case SDLK_KP_ENTER:
                     lastKey = 13;  // ASCII 13 - Enter
-                    std::cout << "[KEYBOARD] Mapped to ENTER" << std::endl;
+                    // std::cout << "[KEYBOARD] Mapped to ENTER" << std::endl;
                     break;
                 case SDLK_BACKSPACE:
                     lastKey = 8;   // ASCII 8 - Backspace
-                    std::cout << "[KEYBOARD] Mapped to BACKSPACE" << std::endl;
+                    // std::cout << "[KEYBOARD] Mapped to BACKSPACE" << std::endl;
                     break;
                 case SDLK_TAB:
                     lastKey = 9;   // ASCII 9 - Tab
-                    std::cout << "[KEYBOARD] Mapped to TAB" << std::endl;
+                    // std::cout << "[KEYBOARD] Mapped to TAB" << std::endl;
                     break;
                 case SDLK_SPACE:
                     lastKey = 32;  // ASCII 32 - Space
-                    std::cout << "[KEYBOARD] Mapped to SPACE" << std::endl;
+                    // std::cout << "[KEYBOARD] Mapped to SPACE" << std::endl;
                     break;
+                case SDLK_F5:
+                    g_einkSimEnabled = !g_einkSimEnabled;
+                    std::cout << "[EINK SIM] " << (g_einkSimEnabled ? "ON" : "OFF") << std::endl;
+                    break;
+
+                case SDLK_F6:
+                    g_einkSimForceFull = true;
+                    std::cout << "[EINK SIM] Force full refresh on next frame" << std::endl;
+                    break;
+
+                case SDLK_F7: {
+                    float gp = g_einkSimCfg.ghosting_partial + 0.04f;
+                    if (gp > 0.12f) gp = 0.0f;
+                    g_einkSimCfg.ghosting_partial = gp;
+                    std::cout << "[EINK SIM] Partial ghosting = " << gp << std::endl;
+                    break;
+                }
+
+                case SDLK_F8:
+                    g_einkSimCfg.wipe_step_px = (g_einkSimCfg.wipe_step_px == 18 ? 10 : 18);
+                    std::cout << "[EINK SIM] wipe_step_px = " << g_einkSimCfg.wipe_step_px << std::endl;
+                    break;
+
                 // Map apostrophe key to trigger dead key processing
                 case SDLK_QUOTE:
                     lastKey = 200; // Special code for apostrophe dead key (avoid conflict with 'd'=100)
@@ -659,7 +655,7 @@ bool DesktopDisplay::handleEvents() {
                     // Map regular character keys through layout system
                     if (e.key.keysym.sym >= 32 && e.key.keysym.sym <= 126) {
                         lastKey = e.key.keysym.sym;
-                        std::cout << "[KEYBOARD] Character key: " << (char)lastKey << " (" << lastKey << ")" << std::endl;
+                        // std::cout << "[KEYBOARD] Character key: " << (char)lastKey << " (" << lastKey << ")" << std::endl;
                     } else {
                         lastKey = e.key.keysym.sym;
                         std::cout << "[SDL2] Special key pressed: " << lastKey << std::endl;
@@ -702,7 +698,7 @@ std::string DesktopDisplay::getUTF8Input() {
 // Utility
 void DesktopDisplay::present() {
     updateEinkTexture();
-    // OLED updates now handled by thread-safe OLED service
+    // OLED is presented by OledService on main thread, not here
 }
 
 SDL_Color DesktopDisplay::getEinkColor(bool black) {
@@ -715,109 +711,93 @@ SDL_Color DesktopDisplay::getOledColor(bool on) {
 
 void DesktopDisplay::updateEinkTexture() {
     if (!einkTexture || !einkRenderer) return;
-    
-    // Add throttling to prevent excessive rendering calls
-    static auto lastUpdate = std::chrono::steady_clock::now();
-    auto now = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUpdate);
-    
-    if (elapsed.count() < 16) { // Limit to ~60 FPS
-        return;
+
+    // Row‑dirty upload (fast path, works for both sim on/off)
+    static std::vector<uint8_t> prevBuf; 
+    const size_t N = size_t(EINK_WIDTH) * size_t(EINK_HEIGHT);
+    if (prevBuf.size() != N) prevBuf.assign(N, 0); // Initialize to black so first clear is detected
+
+    // Find changed rows
+    std::vector<int> dirtyRows;
+    dirtyRows.reserve(EINK_HEIGHT);
+    for (int y = 0; y < EINK_HEIGHT; ++y) {
+        const uint8_t* r  = &einkBuffer[y * EINK_WIDTH];
+        const uint8_t* pr = &prevBuf[y * EINK_WIDTH];
+        if (std::memcmp(r, pr, EINK_WIDTH) != 0) dirtyRows.push_back(y);
     }
-    lastUpdate = now;
-    
-    void* pixels;
-    int pitch;
-    
+    if (dirtyRows.empty()) return;
+
+    // Upload only dirty rows (respect pitch)
+    void* pixels; int pitch;
     if (SDL_LockTexture(einkTexture, nullptr, &pixels, &pitch) != 0) {
         std::cerr << "[SDL2] Failed to lock E-Ink texture: " << SDL_GetError() << std::endl;
         return;
     }
-    
-    uint32_t* dst = (uint32_t*)pixels;
-    const uint8_t* src = einkBuffer.data();
-    
-    // Convert grayscale to RGBA (ABGR format for SDL_PIXELFORMAT_RGBA8888)
-    for (int y = 0; y < EINK_HEIGHT; y++) {
-        for (int x = 0; x < EINK_WIDTH; x++) {
-            uint8_t gray = src[y * EINK_WIDTH + x];
-            // For ARGB8888 format: Alpha, Red, Green, Blue
-            uint32_t rgba = (0xFF << 24) | (gray << 16) | (gray << 8) | gray;
-            dst[y * (pitch / 4) + x] = rgba;
+    auto* dst = static_cast<uint32_t*>(pixels);
+    const int stride = pitch / 4;
+    for (int y : dirtyRows) {
+        const uint8_t* src = &einkBuffer[y * EINK_WIDTH];
+        uint32_t* out = &dst[y * stride];
+        for (int x = 0; x < EINK_WIDTH; ++x) {
+            uint8_t g = src[x];
+            out[x] = 0xFF000000u | (g << 16) | (g << 8) | g;
         }
+        std::memcpy(&prevBuf[y * EINK_WIDTH], src, EINK_WIDTH);
     }
-    
     SDL_UnlockTexture(einkTexture);
     
-    // Present to screen with error handling
-    try {
-        SDL_Rect einkViewport = {0, 0, EINK_WIDTH * 3, EINK_HEIGHT * 3};
-        SDL_RenderSetViewport(einkRenderer, &einkViewport);
-        
-        SDL_SetRenderDrawColor(einkRenderer, 128, 128, 128, 255);
-        SDL_RenderClear(einkRenderer);
-        SDL_RenderCopy(einkRenderer, einkTexture, nullptr, nullptr);
-        SDL_RenderPresent(einkRenderer);
-    } catch (...) {
-        std::cerr << "[SDL2] Exception during E-Ink rendering" << std::endl;
-    }
+    // Ensure viewport is set (some SDL paths require this)
+    SDL_Rect viewport = {0, 0, EINK_WIDTH, EINK_HEIGHT};
+    SDL_RenderSetViewport(einkRenderer, &viewport);
+    
+    SDL_RenderClear(einkRenderer);
+    SDL_RenderCopy(einkRenderer, einkTexture, nullptr, nullptr);
+    SDL_RenderPresent(einkRenderer);
 }
 
 void DesktopDisplay::updateOledTexture() {
-    // DISABLED: All OLED rendering now handled by thread-safe OLED service
-    // This prevents Metal command buffer conflicts
-}
-
-void DesktopDisplay::renderOledText(const std::string& line1, const std::string& line2, const std::string& line3) {
+    // Single, pitch-safe upload + present
     if (!oledTexture || !oledRenderer) return;
     
-    std::cout << "[OLED] Drawing text to buffer..." << std::endl;
-    
-    // Render text lines to buffer
-    if (!line1.empty()) {
-        std::cout << "[OLED] Drawing line1: " << line1 << std::endl;
-        oledDrawText(line1, 0, 8);
-    }
-    if (!line2.empty()) {
-        std::cout << "[OLED] Drawing line2: " << line2 << std::endl;
-        oledDrawText(line2, 0, 16);
-    }
-    if (!line3.empty()) {
-        std::cout << "[OLED] Drawing line3: " << line3 << std::endl;
-        oledDrawText(line3, 0, 24);
-    }
-    
-    // Update texture from buffer
     void* pixels;
     int pitch;
     
     if (SDL_LockTexture(oledTexture, nullptr, &pixels, &pitch) != 0) {
-        std::cout << "[OLED] ERROR: Failed to lock texture: " << SDL_GetError() << std::endl;
+        std::cerr << "[OLED] Failed to lock texture: " << SDL_GetError() << std::endl;
         return;
     }
     
-    uint32_t* texturePixels = static_cast<uint32_t*>(pixels);
-    int pixelCount = 0;
+    auto* texturePixels = static_cast<uint32_t*>(pixels);
+    const int stride = pitch / 4;
     for (int y = 0; y < OLED_HEIGHT; ++y) {
+        const uint8_t* row = &oledBuffer[y * OLED_WIDTH];
+        uint32_t* dst = &texturePixels[y * stride];
         for (int x = 0; x < OLED_WIDTH; ++x) {
-            bool pixelOn = oledBuffer[y * OLED_WIDTH + x];
-            texturePixels[y * OLED_WIDTH + x] = pixelOn ? 0xFFFFFFFF : 0xFF000000;
-            if (pixelOn) pixelCount++;
+            dst[x] = row[x] ? 0xFFFFFFFFu : 0xFF000000u;
         }
     }
-    std::cout << "[OLED] Updated texture with " << pixelCount << " pixels on" << std::endl;
     
     SDL_UnlockTexture(oledTexture);
     
-    // Present OLED window
-    SDL_SetRenderTarget(oledRenderer, nullptr);
-    SDL_Rect oledViewport = {0, 0, OLED_WIDTH * 3, OLED_HEIGHT * 3};
-    SDL_RenderSetViewport(oledRenderer, &oledViewport);
-    
-    SDL_SetRenderDrawColor(oledRenderer, 128, 128, 128, 255);
     SDL_RenderClear(oledRenderer);
     SDL_RenderCopy(oledRenderer, oledTexture, nullptr, nullptr);
     SDL_RenderPresent(oledRenderer);
 }
 
-// Duplicate UTF-8 methods removed - using implementations above
+void DesktopDisplay::renderOledText(const std::string& l1,
+                                    const std::string& l2,
+                                    const std::string& l3) {
+    if (!oledTexture || !oledRenderer) return;
+
+    // Always clear the whole OLED buffer once per "render"
+    oledClear(); // buffer-only
+
+    // Compose the three lines into the buffer (buffer-only)
+    if (!l1.empty()) oledDrawText(l1, 0,  8);  // y are baselines
+    if (!l2.empty()) oledDrawText(l2, 0, 16);
+    if (!l3.empty()) oledDrawText(l3, 0, 24);
+
+    // Present exactly once (handles pitch + SDL_RenderCopy/Present)
+    updateOledTexture();
+}
+

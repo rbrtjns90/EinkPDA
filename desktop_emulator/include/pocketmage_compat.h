@@ -446,7 +446,7 @@ public:
         if (g_display) {
             g_display->einkClear();
             // Draw a test pattern to verify display is working
-            g_display->einkDrawText("PocketMage Emulator", 10, 10);
+            g_display->einkDrawText("PocketMage Emulator", 10, 10, 12);
             g_display->einkDrawRect(5, 5, 300, 118, false);
         }
     }
@@ -454,7 +454,10 @@ public:
     void setTextColor(uint16_t color) { text_color = color; }
     void setFullWindow() {}
     void fillScreen(uint16_t color) {
-        if (g_display) g_display->einkClear();
+        if (g_display) {
+            g_display->einkClear();
+            g_display->einkForceFullRefresh(); // Force complete screen update to clear artifacts
+        }
     }
     void display(bool partial = false) {
         if (g_display) g_display->einkRefresh();

@@ -11,6 +11,20 @@ extern "C" {
 }
 #endif
 
+// Shared helper for partial region updates (emulator vs hardware)
+static inline void flushPartialRect(int x, int y, int w, int h) {
+#ifdef DESKTOP_EMULATOR
+  // Desktop: no region API; presenter already uploads only rows that changed.
+  if (g_display) g_display->einkPartialRefresh();
+#else
+  // Real GxEPD2: push only this window; 'true' = fast (no flashing)
+  // NOTE: GxEPD2 requires width/height multiples of 8 on some panels.
+  int x8 = x & ~7;
+  int w8 = ((x + w + 7) & ~7) - x8;
+  display.updateWindow(x8, y, w8, h, true);
+#endif
+}
+
 // Forward declarations for compatibility
 void drawPERIODIC();
 void einkHandler_PERIODIC() { drawPERIODIC(); }
@@ -36,6 +50,9 @@ static uint8_t selZ = 0;  // No element selected initially
 static bool in_detail = false;
 static bool in_search = false;
 static ViewMode viewMode = GRID_VIEW;
+
+// Optional: black-scrub old cell before restoring it (fights ghosting)
+static const bool kBlackScrub = true;
 
 // Geometry constants for 310x240 E-ink display
 static const int grid_x = 6, grid_y = 20, grid_w = 298, grid_h = 180;
@@ -308,9 +325,63 @@ static void drawHighlight(Rect r) {
 }
 
 static void panelPartialUpdate(Rect r) {
-  // Simplified partial update - just do a full refresh for now
-  // This eliminates the Metal GPU crashes while maintaining functionality
-  refresh();
+  // Force a proper display update by calling the display system
+  // This ensures our row-dirty system detects the changes
+  if (g_display) {
+    g_display->einkRefresh();
+  }
+}
+
+// Draw a 1px black border around a rect, without relying on drawRect on desktop.
+static inline void drawBorderRect(int x, int y, int w, int h) {
+#ifdef DESKTOP_EMULATOR
+  // Use the emulator's low-level line primitive to guarantee an outline only.
+  if (g_display) {
+    g_display->einkDrawLine(x,         y,         x + w - 1, y,         true); // top
+    g_display->einkDrawLine(x,         y + h - 1, x + w - 1, y + h - 1, true); // bottom
+    g_display->einkDrawLine(x,         y,         x,         y + h - 1, true); // left
+    g_display->einkDrawLine(x + w - 1, y,         x + w - 1, y + h - 1, true); // right
+  } else {
+    // Fallback, should not happen on emulator
+    display.drawRect(x, y, w, h, GxEPD_BLACK);
+  }
+#else
+  // On hardware, the GFX drawRect is reliable for a 1px outline.
+  display.drawRect(x, y, w, h, GxEPD_BLACK);
+#endif
+}
+
+// Paint one table cell fully (background + border + text).
+static void drawCell(int col, int row, bool selected) {
+  if (col < 0 || col >= 18 || row < 0 || row >= 9) return;
+  Cell& cell = PT_LAYOUT[row][col];
+  if (cell.z == 0) return;
+
+  const int x = grid_x + col * col_w;
+  const int y = grid_y + row * row_h;
+
+  // 1) Background fill – white for normal, black for selected.
+  if (selected) {
+    display.fillRect(x, y, col_w, row_h, GxEPD_BLACK);
+    display.setTextColor(GxEPD_WHITE);
+  } else {
+    // Make sure interior is white on full repaints
+    display.fillRect(x + 1, y + 1, col_w - 2, row_h - 2, GxEPD_WHITE);
+    display.drawRect(x, y, col_w, row_h, GxEPD_BLACK);
+    display.setTextColor(GxEPD_BLACK);
+  }
+
+  // 2) Border (explicit 1px outline; robust on all backends)
+  drawBorderRect(x, y, col_w, row_h);
+
+  // 3) Content (symbol + atomic number)
+  display.setFont(&FreeMono12pt7b);
+  display.setCursor(x + 2, y + 12);
+  display.print(get_symbol(cell.z));
+
+  display.setFont(&FreeMonoBold9pt7b);
+  display.setCursor(x + 1, y + row_h - 2);
+  display.print(cell.z);
 }
 
 static void onCursorMove(int newCol, int newRow) {
@@ -318,34 +389,52 @@ static void onCursorMove(int newCol, int newRow) {
     renderStaticTableOnce();
     return;
   }
-  
+
   prev_col = sel_col;
   prev_row = sel_row;
   sel_col = newCol;
   sel_row = newRow;
-  
+
+  // 1) Restore previous cell to white
   if (prev_col >= 0 && prev_row >= 0) {
-    Rect rcPrev = alignToByte(cellRect(prev_col, prev_row));
-    Rect rcCur = alignToByte(cellRect(sel_col, sel_row));
-    
-    // Restore old cell from static background
-    blitCanvas(gridCanvas, frontCanvas, rcPrev);
-    
-    // Ensure new cell starts from base
-    blitCanvas(gridCanvas, frontCanvas, rcCur);
-    
-    // Draw highlight on new cell
-    drawHighlight(rcCur);
-    
-    // Update only the changed regions
-    panelPartialUpdate(rcPrev);  // Clear old highlight
-    panelPartialUpdate(rcCur);   // Draw new highlight
-  } else {
-    // First selection - just highlight the new cell
-    Rect rcCur = alignToByte(cellRect(sel_col, sel_row));
-    blitCanvas(gridCanvas, frontCanvas, rcCur);
-    drawHighlight(rcCur);
-    panelPartialUpdate(rcCur);
+    Rect rcPrev = cellRect(prev_col, prev_row);
+    Cell& prevCell = PT_LAYOUT[prev_row][prev_col];
+    if (prevCell.z > 0) {
+      // 1) Clear previous cell BACKGROUND to WHITE
+      display.fillRect(rcPrev.x, rcPrev.y, rcPrev.w, rcPrev.h, GxEPD_WHITE);
+
+      // 2) Redraw it as a normal (non-selected) cell
+      display.drawRect(rcPrev.x, rcPrev.y, rcPrev.w, rcPrev.h, GxEPD_BLACK);
+      display.setTextColor(GxEPD_BLACK);
+
+      display.setFont(&FreeMono12pt7b);
+      display.setCursor(rcPrev.x + 2, rcPrev.y + 12);
+      display.print(get_symbol(prevCell.z));
+
+      display.setFont(&FreeMonoBold9pt7b);
+      display.setCursor(rcPrev.x + 1, rcPrev.y + rcPrev.h - 2);
+      display.print(prevCell.z);
+    }
+  }
+
+  // 2) Draw current cell as selected (black interior + white text)
+  Rect rcCur = cellRect(sel_col, sel_row);
+  Cell& curCell = PT_LAYOUT[sel_row][sel_col];
+  if (curCell.z > 0) {
+    // Solid black selection + white text
+    display.fillRect(rcCur.x, rcCur.y, rcCur.w, rcCur.h, GxEPD_BLACK);
+    display.setTextColor(GxEPD_WHITE);
+    display.setFont(&FreeMono12pt7b);
+    display.setCursor(rcCur.x + 2, rcCur.y + 12);
+    display.print(get_symbol(curCell.z));
+    display.setFont(&FreeMonoBold9pt7b);
+    display.setCursor(rcCur.x + 1, rcCur.y + rcCur.h - 2);
+    display.print(curCell.z);
+  }
+
+  // 3) Push one partial update for the union region (safe to keep full here too)
+  if (g_display) {
+    g_display->einkRefresh();
   }
 }
 
@@ -353,45 +442,20 @@ static void paint_table() {
   if (!didFullRefresh) {
     renderStaticTableOnce();
   }
-  
-  // Draw the table with current selection highlighted
+
+  // Baseline: white screen, header
   display.fillScreen(GxEPD_WHITE);
   display.setTextColor(GxEPD_BLACK);
-  
-  // Draw title
   display.setFont(&FreeMonoBold9pt7b);
   display.setCursor(10, 15);
   display.print("Periodic Table");
-  
-  // Draw all element cells
+
+  // Draw all cells once (only selected one has black background)
   for (int row = 0; row < 9; row++) {
     for (int col = 0; col < 18; col++) {
-      Cell& cell = PT_LAYOUT[row][col];
-      if (cell.z == 0) continue;  // Skip empty cells
-      
-      int x = grid_x + col * col_w;
-      int y = grid_y + row * row_h;
-      
-      bool isSelected = (col == sel_col && row == sel_row);
-      
-      // Draw cell background - inverted if selected
-      if (isSelected) {
-        display.fillRect(x, y, col_w, row_h, GxEPD_BLACK);
-        display.setTextColor(GxEPD_WHITE);
-      } else {
-        display.drawRect(x, y, col_w, row_h, GxEPD_BLACK);
-        display.setTextColor(GxEPD_BLACK);
-      }
-      
-      // Draw element symbol
-      display.setFont(&FreeMono12pt7b);
-      display.setCursor(x + 2, y + 12);
-      display.print(get_symbol(cell.z));
-      
-      // Draw atomic number
-      display.setFont(&FreeMonoBold9pt7b);
-      display.setCursor(x + 1, y + row_h - 2);
-      display.print(cell.z);
+      if (PT_LAYOUT[row][col].z == 0) continue;
+      const bool isSelected = (col == sel_col && row == sel_row);
+      drawCell(col, row, isSelected);
     }
   }
 }

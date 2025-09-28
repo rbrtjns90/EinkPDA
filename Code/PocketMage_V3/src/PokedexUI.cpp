@@ -829,7 +829,7 @@ namespace PokedexUI {
           case 20: // LEFT - Previous Pokemon
             if (state.selected > 0) state.selected--;
             break;
-          case 22: // RIGHT - Next Pokemon
+          case 18: // RIGHT - Next Pokemon
             if (state.selected + 1 < (int)state.filteredIndex.size()) state.selected++;
             break;
           case 8: case 27: // BACKSPACE or ESC
@@ -872,4 +872,132 @@ namespace PokedexUI {
     
     clampSelection(state);
   }
+
+// Draw one grid cell (shared by full & partial paths)
+static void drawOneCell(IGraphics& gfx,
+                        const DexState& state,
+                        const DexMon& mon,
+                        SpriteCache& cache,
+                        int screenX, int screenY, int cellW, bool selected)
+{
+  // Cell frame
+  if (selected) {
+    gfx.drawRect(screenX + 1, screenY + 1, cellW - 2, Layout::cellH - 2, Gray::Black);
+    gfx.drawRect(screenX + 2, screenY + 2, cellW - 4, Layout::cellH - 4, Gray::Black);
+  } else {
+    gfx.drawRect(screenX, screenY, cellW, Layout::cellH, Gray::Black);
+  }
+
+  // Mini sprite
+  const uint8_t* sprite = cache.get32(mon.id);
+  if (sprite) {
+    gfx.drawSprite(screenX + Layout::padding, screenY + Layout::padding, sprite, 32, 32);
+  }
+
+  // Text
+  int textX = screenX + Layout::padding + 36;
+  int textY = screenY + Layout::padding + 12;
+  gfx.setFont(1);
+  String idStr = "#" + String(mon.id);
+  if (mon.id < 10) idStr = "#00" + String(mon.id);
+  else if (mon.id < 100) idStr = "#0" + String(mon.id);
+  gfx.drawText(textX, textY, idStr, Gray::Black);
+  gfx.drawText(textX, textY + 14, String(mon.nameLower.c_str()), Gray::Black);
+
+  // Small HP bar
+  int hpBarW = 40;
+  int hpBarX = screenX + cellW - hpBarW - Layout::padding;
+  int hpBarY = screenY + Layout::cellH - 12;
+  int hpWidth = (hpBarW * mon.stats[0]) / 255;
+  gfx.fillRect(hpBarX, hpBarY, hpBarW, 4, Gray::Light);
+  gfx.fillRect(hpBarX, hpBarY, hpWidth, 4, Gray::Dark);
+}
+
+// Compute rect for an absolute list index i given the current viewport logic in drawPokemonGrid()
+bool gridCellRectForIndex(IGraphics& gfx, const DexState& state, int i, Rect& out) {
+  if (i < 0 || i >= (int)state.filteredIndex.size()) return false;
+
+  const int cellW  = gfx.screenW() / 2;
+  const int startY = Layout::topY + 10;
+  const int itemsPerRow = 2;
+  const int visibleRows = (gfx.screenH() - startY - 30) / Layout::cellH;
+  const int maxVisibleItems = visibleRows * itemsPerRow;
+
+  // IMPORTANT: drawPokemonGrid() centers the viewport around selection, not a persistent scroll.
+  // We must mirror that exactly; otherwise incremental rects would drift.
+  const int selectedRow = state.selected / itemsPerRow;
+  const int startRow = std::max(0, selectedRow - visibleRows / 2);
+  const int startIndex = startRow * itemsPerRow;
+  const int endIndex = std::min((int)state.filteredIndex.size(), startIndex + maxVisibleItems);
+
+  if (i < startIndex || i >= endIndex) return false;
+
+  const int row = (i - startIndex) / itemsPerRow;
+  const int col = (i - startIndex) % itemsPerRow;
+  out.x = col * cellW;
+  out.y = startY + row * Layout::cellH;
+  out.w = cellW;
+  out.h = Layout::cellH;
+  return true;
+}
+
+// Repaint only prev/current cells; fall back to full redraw when viewport moves
+void updateListSelection(IGraphics& gfx,
+                         DexState& state,
+                         const std::vector<DexMon>& mons,
+                         SpriteCache& cache,
+                         int prevSelected)
+{
+  // If list is empty, nothing to do
+  if (state.filteredIndex.empty() || state.selected < 0 || state.selected >= (int)state.filteredIndex.size())
+    return;
+
+  Rect curR;
+  const bool curVis = gridCellRectForIndex(gfx, state, state.selected, curR);
+
+  Rect prevR;
+  const bool prevVis = (prevSelected >= 0) && gridCellRectForIndex(gfx, state, prevSelected, prevR);
+
+  // If the viewport changed (e.g., selection moved enough to recenter the grid),
+  // our two-rect update isn't sufficient to keep neighboring cells correct.
+  // In that case: do a full redraw (exactly what drawPokemonGrid does).
+  const bool viewportChanged = (!prevVis && prevSelected >= 0);
+
+  if (viewportChanged) {
+    // Full repaint path (safe and consistent)
+    drawPokemonGrid(gfx, state, mons, cache);
+    // One call is enough; your handler will call refresh() afterwards on hardware,
+    // or the emulator will push rows that changed.
+    return;
+  }
+
+  // Fast path: only prev + current cells
+
+  if (prevVis) {
+    // Optional black-scrub on the outgoing cell to reduce ghosting
+#ifdef DESKTOP_EMULATOR
+    const bool blackScrub = true;
+#else
+    const bool blackScrub = true;
+#endif
+    if (blackScrub) {
+      gfx.fillRect(prevR.x, prevR.y, prevR.w, prevR.h, Gray::Black);
+      gfx.flushPartial(prevR.x, prevR.y, prevR.w, prevR.h);
+    }
+
+    // Redraw previous cell as "normal"
+    const DexMon& prevMon = mons[state.filteredIndex[prevSelected]];
+    gfx.fillRect(prevR.x, prevR.y, prevR.w, prevR.h, Gray::White);
+    drawOneCell(gfx, state, prevMon, cache, prevR.x, prevR.y, prevR.w, /*selected=*/false);
+    gfx.flushPartial(prevR.x, prevR.y, prevR.w, prevR.h);
+  }
+
+  if (curVis) {
+    const DexMon& curMon = mons[state.filteredIndex[state.selected]];
+    gfx.fillRect(curR.x, curR.y, curR.w, curR.h, Gray::White); // ensure clean background
+    drawOneCell(gfx, state, curMon, cache, curR.x, curR.y, curR.w, /*selected=*/true);
+    gfx.flushPartial(curR.x, curR.y, curR.w, curR.h);
+  }
+}
+
 }

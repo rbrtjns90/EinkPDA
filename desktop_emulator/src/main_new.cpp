@@ -87,13 +87,16 @@ void emulatorSetup() {
     std::cout << "Drawing initial HOME screen..." << std::endl;
     
     // Force PocketMage to redraw HOME screen by setting newState = true
-    extern volatile bool newState;
     newState = true;
     
     std::cout << "Calling PocketMage HOME handler..." << std::endl;
     applicationEinkHandler();
     g_display->present();
     std::cout << "Initial drawing complete." << std::endl;
+
+    // Show PocketMage on the small OLED at startup
+    oled_set_lines("PocketMage", "Desktop Emulator", "Ready");
+    // Will be presented by oled_present_if_dirty() in main loop
 }
 
 // Emulator-specific loop
@@ -146,17 +149,8 @@ int main() {
         // Call the E-Ink handler to render UI
         applicationEinkHandler();
         
-        // Present OLED updates on main thread (thread-safe)
+        // Present OLED updates once (main thread)
         oled_present_if_dirty();
-        
-        // Render OLED content directly via display system
-        char line1[32], line2[32], line3[32];
-        int valid;
-        oled_get_snapshot(line1, line2, line3, &valid);
-        if (valid && g_display) {
-            std::cout << "[OLED] Rendering: '" << line1 << "' / '" << line2 << "' / '" << line3 << "'" << std::endl;
-            g_display->renderOledText(std::string(line1), std::string(line2), std::string(line3));
-        }
         
         // Present only after all rendering is complete
         g_display->present();
