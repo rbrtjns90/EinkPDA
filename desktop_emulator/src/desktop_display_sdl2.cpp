@@ -481,10 +481,7 @@ void DesktopDisplay::oledSetPixel(int x, int y, bool on) {
 void DesktopDisplay::oledDrawText(const std::string& text, int x, int y, int size) {
     if (!font || text.empty()) return;
 
-    // Buffer-only: clear a conservative area for this line
-    const int estimatedWidth  = int(text.length()) * (size + 2);
-    const int estimatedHeight = size + 6;
-    oledClearRect(x, y - estimatedHeight + 2, estimatedWidth, estimatedHeight);
+    // No need to clear here - renderOledText() already clears the whole buffer
 
     SDL_Color fg = {255,255,255,255};
     SDL_Color bg = {0,0,0,255};
@@ -789,15 +786,15 @@ void DesktopDisplay::renderOledText(const std::string& l1,
                                     const std::string& l3) {
     if (!oledTexture || !oledRenderer) return;
 
-    // Always clear the whole OLED buffer once per "render"
-    oledClear(); // buffer-only
+    // Clear whole OLED buffer once
+    std::fill(oledBuffer.begin(), oledBuffer.end(), 0);
 
-    // Compose the three lines into the buffer (buffer-only)
-    if (!l1.empty()) oledDrawText(l1, 0,  8);  // y are baselines
-    if (!l2.empty()) oledDrawText(l2, 0, 16);
-    if (!l3.empty()) oledDrawText(l3, 0, 24);
+    // Draw text with proper baselines and font size (8px font)
+    if (!l1.empty()) oledDrawText(l1, 0, 8, 8);
+    if (!l2.empty()) oledDrawText(l2, 0, 16, 8);
+    if (!l3.empty()) oledDrawText(l3, 0, 24, 8);
 
-    // Present exactly once (handles pitch + SDL_RenderCopy/Present)
+    // Present once
     updateOledTexture();
 }
 

@@ -53,10 +53,19 @@ static ViewMode viewMode = GRID_VIEW;
 
 // Optional: black-scrub old cell before restoring it (fights ghosting)
 static const bool kBlackScrub = true;
-
 // Geometry constants for 310x240 E-ink display
-static const int grid_x = 6, grid_y = 20, grid_w = 298, grid_h = 180;
+static const int grid_x = 6, grid_y = 30, grid_w = 306, grid_h = 180;
 static int col_w, row_h;
+
+// Helper: draw 1px border using only fillRect (avoids buggy drawRect on emulator)
+static inline void strokeRect1px(int x, int y, int w, int h, uint16_t color) {
+  // Top and bottom
+  display.fillRect(x,         y,         w, 1, color);
+  display.fillRect(x,         y + h - 1, w, 1, color);
+  // Left and right
+  display.fillRect(x,         y,         1, h, color);
+  display.fillRect(x + w - 1, y,         1, h, color);
+}
 
 // Layout grid: 18 columns x 9 rows (includes f-block)
 static Cell PT_LAYOUT[9][18];
@@ -221,92 +230,59 @@ static void move_selection(int dc, int dr) {
   }
 }
 
-static void paint_cell(int x, int y, int w, int h, uint8_t z, bool selected) {
-  if (z == 0 || z > 118) return;  // Empty cell or invalid
-  
-  const PackedElement& elem = E(z);
-  
-  // Background pattern based on category
-  if (selected) {
-    display.fillRect(x, y, w, h, GxEPD_BLACK);
-    display.setTextColor(GxEPD_WHITE);
-  } else {
-    display.drawRect(x, y, w, h, GxEPD_BLACK);
-    display.setTextColor(GxEPD_BLACK);
+static void drawCellNormal(int col, int row);
+static void drawCellSelected(int col, int row);
+
+static void onCursorMove(int newCol, int newRow) {
+  // Always allow cursor movement - no canvas dependency
+
+  // Remember previous
+  prev_col = sel_col;
+  prev_row = sel_row;
+  sel_col  = newCol;
+  sel_row  = newRow;
+
+  // 1) Un-highlight previous by fully redrawing it *normal* (white interior)
+  if (prev_col >= 0 && prev_row >= 0) {
+    Cell& prevCell = PT_LAYOUT[prev_row][prev_col];
+    if (prevCell.z > 0) drawCellNormal(prev_col, prev_row);
   }
-  
-  // Atomic number (centered, larger font for better visibility)
-  display.setFont(&FreeSans12pt7b);
-  char num_str[4];
-  snprintf(num_str, sizeof(num_str), "%d", z);
-  
-  int16_t x1, y1;
-  uint16_t nw, nh;
-  display.getTextBounds(num_str, 0, 0, &x1, &y1, &nw, &nh);
-  display.setCursor(x + (w - nw) / 2, y + h / 2 + nh / 2);
-  display.print(num_str);
-  
-  // Remove atomic mass from cells to reduce clutter
-  // Mass will be shown in detail view and OLED display
+
+  // 2) Draw new selection with double border (no black fill)
+  Cell& curCell = PT_LAYOUT[sel_row][sel_col];
+  if (curCell.z > 0) drawCellSelected(sel_col, sel_row);
+
+  // Push the small change to the panel
+  if (g_display) g_display->einkRefresh();
 }
 
-static void renderStaticTableOnce() {
-  if (!canvasInitialized) {
-    initCanvases();
-  }
+static void paint_table() {
+  // Always render fresh - no canvas caching to avoid artifacts
   
-  std::cout << "[PERIODIC] Rendering static table to canvas..." << std::endl;
-  
-  // Clear grid canvas to white
-  size_t canvasSize = (SCREEN_W * SCREEN_H + 7) / 8;
-  memset(gridCanvas, 0xFF, canvasSize);
-  
-  // Calculate cell dimensions
-  col_w = grid_w / 18;  // 18 columns
-  row_h = grid_h / 9;   // 9 rows
-  
-  // Render to off-screen canvas using display as temporary target
+  // Baseline: white screen, header
   display.fillScreen(GxEPD_WHITE);
   display.setTextColor(GxEPD_BLACK);
-  
-  // Draw title
   display.setFont(&FreeMonoBold9pt7b);
   display.setCursor(10, 15);
   display.print("Periodic Table");
-  
-  // Draw all element cells (without selection highlighting)
+
+  // Draw all cells once (only selected one has double border)
   for (int row = 0; row < 9; row++) {
     for (int col = 0; col < 18; col++) {
-      Cell& cell = PT_LAYOUT[row][col];
-      if (cell.z == 0) continue;  // Skip empty cells
-      
-      int x = grid_x + col * col_w;
-      int y = grid_y + row * row_h;
-      
-      // Draw cell border (no fill)
-      display.drawRect(x, y, col_w, row_h, GxEPD_BLACK);
-      display.setTextColor(GxEPD_BLACK);
-      
-      // Draw element symbol
-      display.setFont(&FreeMono12pt7b);
-      display.setCursor(x + 2, y + 12);
-      display.print(get_symbol(cell.z));
-      
-      // Draw atomic number
-      display.setFont(&FreeMonoBold9pt7b);
-      display.setCursor(x + 1, y + row_h - 2);
-      display.print(cell.z);
+      if (PT_LAYOUT[row][col].z == 0) continue;
+      const bool isSelected = (col == sel_col && row == sel_row);
+      if (isSelected) {
+        drawCellSelected(col, row);
+      } else {
+        drawCellNormal(col, row);
+      }
     }
   }
   
-  // Copy display buffer to grid canvas (this is a simplified approach)
-  // In a real implementation, you'd render directly to the canvas
-  memcpy(frontCanvas, gridCanvas, canvasSize);
-  
-  // Push full-screen baseline to panel
+  // Force refresh to show the clean table
   refresh();
-  didFullRefresh = true;
 }
+
 
 static void drawHighlight(Rect r) {
   // Invert the cell area for highlighting
@@ -351,113 +327,50 @@ static inline void drawBorderRect(int x, int y, int w, int h) {
 #endif
 }
 
-// Paint one table cell fully (background + border + text).
-static void drawCell(int col, int row, bool selected) {
-  if (col < 0 || col >= 18 || row < 0 || row >= 9) return;
+
+// Helper: Draw a normal cell (white interior + single border)
+static inline void drawCellNormal(int col, int row) {
   Cell& cell = PT_LAYOUT[row][col];
   if (cell.z == 0) return;
-
   const int x = grid_x + col * col_w;
   const int y = grid_y + row * row_h;
 
-  // 1) Background fill – white for normal, black for selected.
-  if (selected) {
-    display.fillRect(x, y, col_w, row_h, GxEPD_BLACK);
-    display.setTextColor(GxEPD_WHITE);
-  } else {
-    // Make sure interior is white on full repaints
-    display.fillRect(x + 1, y + 1, col_w - 2, row_h - 2, GxEPD_WHITE);
-    display.drawRect(x, y, col_w, row_h, GxEPD_BLACK);
-    display.setTextColor(GxEPD_BLACK);
-  }
+  // 1) Clear ENTIRE cell area to white first (critical!)
+  display.fillRect(x, y, col_w, row_h, GxEPD_WHITE);
 
-  // 2) Border (explicit 1px outline; robust on all backends)
-  drawBorderRect(x, y, col_w, row_h);
-
-  // 3) Content (symbol + atomic number)
+  // 2) Draw border + black text
+  display.drawRect(x, y, col_w, row_h, GxEPD_BLACK);
+  display.setTextColor(GxEPD_BLACK);
   display.setFont(&FreeMono12pt7b);
   display.setCursor(x + 2, y + 12);
   display.print(get_symbol(cell.z));
-
   display.setFont(&FreeMonoBold9pt7b);
   display.setCursor(x + 1, y + row_h - 2);
   display.print(cell.z);
 }
 
-static void onCursorMove(int newCol, int newRow) {
-  if (!didFullRefresh) {
-    renderStaticTableOnce();
-    return;
-  }
+// Helper: Draw a selected cell (white interior + double border)
+static inline void drawCellSelected(int col, int row) {
+  Cell& cell = PT_LAYOUT[row][col];
+  if (cell.z == 0) return;
+  const int x = grid_x + col * col_w;
+  const int y = grid_y + row * row_h;
 
-  prev_col = sel_col;
-  prev_row = sel_row;
-  sel_col = newCol;
-  sel_row = newRow;
-
-  // 1) Restore previous cell to white
-  if (prev_col >= 0 && prev_row >= 0) {
-    Rect rcPrev = cellRect(prev_col, prev_row);
-    Cell& prevCell = PT_LAYOUT[prev_row][prev_col];
-    if (prevCell.z > 0) {
-      // 1) Clear previous cell BACKGROUND to WHITE
-      display.fillRect(rcPrev.x, rcPrev.y, rcPrev.w, rcPrev.h, GxEPD_WHITE);
-
-      // 2) Redraw it as a normal (non-selected) cell
-      display.drawRect(rcPrev.x, rcPrev.y, rcPrev.w, rcPrev.h, GxEPD_BLACK);
-      display.setTextColor(GxEPD_BLACK);
-
-      display.setFont(&FreeMono12pt7b);
-      display.setCursor(rcPrev.x + 2, rcPrev.y + 12);
-      display.print(get_symbol(prevCell.z));
-
-      display.setFont(&FreeMonoBold9pt7b);
-      display.setCursor(rcPrev.x + 1, rcPrev.y + rcPrev.h - 2);
-      display.print(prevCell.z);
-    }
-  }
-
-  // 2) Draw current cell as selected (black interior + white text)
-  Rect rcCur = cellRect(sel_col, sel_row);
-  Cell& curCell = PT_LAYOUT[sel_row][sel_col];
-  if (curCell.z > 0) {
-    // Solid black selection + white text
-    display.fillRect(rcCur.x, rcCur.y, rcCur.w, rcCur.h, GxEPD_BLACK);
-    display.setTextColor(GxEPD_WHITE);
-    display.setFont(&FreeMono12pt7b);
-    display.setCursor(rcCur.x + 2, rcCur.y + 12);
-    display.print(get_symbol(curCell.z));
-    display.setFont(&FreeMonoBold9pt7b);
-    display.setCursor(rcCur.x + 1, rcCur.y + rcCur.h - 2);
-    display.print(curCell.z);
-  }
-
-  // 3) Push one partial update for the union region (safe to keep full here too)
-  if (g_display) {
-    g_display->einkRefresh();
-  }
-}
-
-static void paint_table() {
-  if (!didFullRefresh) {
-    renderStaticTableOnce();
-  }
-
-  // Baseline: white screen, header
-  display.fillScreen(GxEPD_WHITE);
+  // 1) Clear ENTIRE cell area to white first (critical!)
+  display.fillRect(x, y, col_w, row_h, GxEPD_WHITE);
+  
+  // 2) Draw double border (outer + inner)
+  display.drawRect(x,   y,   col_w,   row_h,   GxEPD_BLACK);
+  display.drawRect(x+1, y+1, col_w-2, row_h-2, GxEPD_BLACK);
+  
+  // 3) Draw text
   display.setTextColor(GxEPD_BLACK);
+  display.setFont(&FreeMono12pt7b);
+  display.setCursor(x + 2, y + 12);
+  display.print(get_symbol(cell.z));
   display.setFont(&FreeMonoBold9pt7b);
-  display.setCursor(10, 15);
-  display.print("Periodic Table");
-
-  // Draw all cells once (only selected one has black background)
-  for (int row = 0; row < 9; row++) {
-    for (int col = 0; col < 18; col++) {
-      if (PT_LAYOUT[row][col].z == 0) continue;
-      const bool isSelected = (col == sel_col && row == sel_row);
-      drawCell(col, row, isSelected);
-    }
-  }
+  display.setCursor(x + 1, y + row_h - 2);
+  display.print(cell.z);
 }
 
 static void paint_detail() {
@@ -619,10 +532,18 @@ static void update_oled() {
 
 void PERIODIC_INIT() {
   std::cout << "[POCKETMAGE] PERIODIC_INIT() starting..." << std::endl;
+  
+  // Clear screen to remove any artifacts from previous apps
+  display.fillScreen(GxEPD_WHITE);
+  refresh();
+  
   CurrentAppState = PERIODIC;
   CurrentKBState = NORMAL;
   newState = true;
   doFull = true;
+  
+  // Reset canvas state to force fresh render
+  periodic::didFullRefresh = false;
   
   // Compute cell dimensions
   periodic::col_w = periodic::grid_w / 18;
@@ -786,10 +707,7 @@ void processKB_PERIODIC() {
 }
 
 void drawPERIODIC() {
-  // Initialize canvases on first run
-  if (!periodic::canvasInitialized) {
-    periodic::initCanvases();
-  }
+  // Skip canvas initialization - use direct rendering only
   
   if (newState) {
     newState = false;

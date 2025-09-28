@@ -481,10 +481,16 @@ public:
     }
     void print(const String& text) { print(text.c_str()); }
     void drawRect(int x, int y, int w, int h, uint16_t color) {
-        if (g_display) g_display->einkDrawRect(x, y, w, h);
+        if (g_display) {
+            bool black = (color == GxEPD_BLACK);
+            g_display->einkDrawRect(x, y, w, h, false, black);
+        }
     }
     void fillRect(int x, int y, int w, int h, uint16_t color) {
-        if (g_display) g_display->einkDrawRect(x, y, w, h, true);
+        if (g_display) {
+            bool black = (color == GxEPD_BLACK);
+            g_display->einkDrawRect(x, y, w, h, true, black);
+        }
     }
     void drawBitmap(int x, int y, const uint8_t* bitmap, int w, int h, uint16_t color) {
         if (g_display && bitmap) {
