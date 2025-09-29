@@ -477,47 +477,8 @@ void processKB_POKEDEX() {
       }
     }
     
-    // Update OLED only when needed to prevent Metal issues
-    static bool isRendering = false;
-    if (newState && !isRendering) {
-      currentMillis = millis();
-      if (currentMillis - OLEDFPSMillis >= 300) { // Minimum 300ms between updates
-        isRendering = true;
-        OLEDFPSMillis = currentMillis;
-        
-        // Clear screen only once
-        u8g2.clearBuffer();
-        
-        // Use new UI system based on current view
-        DexView currentView = getDexStateRef().view;
-        switch (currentView) {
-          case DexView::List:
-            drawNewPokemonList();
-            break;
-          case DexView::Detail:
-            drawNewPokemonDetail();
-            break;
-          case DexView::Search:
-            drawNewSearchScreen();
-            break;
-          default:
-            drawNewPokemonList();
-            break;
-        }
-        
-        // Display buffer with error handling - skip to prevent double commit
-        // The E-Ink handler will handle the actual display update
-        // try {
-        //   u8g2.sendBuffer();
-        //   delay(5); // Ensure command buffer completion
-        // } catch (...) {
-        //   // Ignore Metal errors to prevent crashes
-        // }
-        
-        newState = false;
-        isRendering = false;
-      }
-    }
+    // REMOVED: Keyboard handler no longer does rendering to prevent double-draw
+    // All rendering is now handled by einkHandler_POKEDEX() to prevent Metal conflicts
     
     KBBounceMillis = currentMillis;
   }
@@ -530,8 +491,8 @@ void einkHandler_POKEDEX() {
   static int lastSelected = -1;
   unsigned long now = millis();
   
-  // Prevent concurrent rendering and limit update frequency
-  if (rendering || now - lastEinkUpdate < 1000) return;
+  // Prevent concurrent rendering and limit update frequency to prevent Metal conflicts
+  if (rendering || now - lastEinkUpdate < 100) return; // Reduced from 1000ms to 100ms
   
   rendering = true;
   lastEinkUpdate = now;
