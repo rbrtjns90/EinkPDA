@@ -8,8 +8,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-// Simple resize implementation - no external library needed
-
 class ImageToIcon {
 private:
     int width, height, channels;
