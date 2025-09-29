@@ -132,6 +132,26 @@ fi
 CMAKE_VERSION=$(cmake --version | head -n1 | cut -d' ' -f3)
 print_success "Found CMake $CMAKE_VERSION"
 
+# Download fonts if needed
+print_status "Checking and downloading fonts..."
+FONTS_SCRIPT="$(dirname "$0")/fonts/download_fonts.sh"
+if [[ -f "$FONTS_SCRIPT" ]]; then
+    if [[ "$DRY_RUN" == true ]]; then
+        print_status "Would run font downloader: $FONTS_SCRIPT"
+    else
+        print_status "Running font downloader..."
+        if bash "$FONTS_SCRIPT"; then
+            print_success "Fonts ready"
+        else
+            print_error "Font download failed"
+            exit 1
+        fi
+    fi
+else
+    print_warning "Font downloader script not found at: $FONTS_SCRIPT"
+    print_status "Fonts may need to be downloaded manually"
+fi
+
 # Handle clean build option
 if [[ "$CLEAN_BUILD" == true ]]; then
     print_status "Cleaning build directory: $BUILD_DIR"

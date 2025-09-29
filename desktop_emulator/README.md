@@ -1,35 +1,48 @@
 # PocketMage Desktop Emulator
 
 A comprehensive SDL2-based desktop emulator for the PocketMage handheld E-ink PDA device, featuring multiple applications including text editing, file management, task tracking, journaling, and a fully functional Pokédex.
-
 ![PocketMage Home Screen](home.png)
 
 ## Quick Start
 
 ### Prerequisites
+- **SDL2** and **SDL2_ttf** development libraries
+- **CMake** 3.16 or later
+- **C++17** compatible compiler
+- **curl** or **wget** (for automatic font downloading)
 
-**macOS:**
+### Build Instructions
+
+**Automated Build (Recommended):**
+```bash
+# macOS and Linux - handles dependencies and fonts automatically
+./build.sh
+
+# For clean build
+./build.sh --clean
+
+# Check dependencies without building
+./build.sh --dry-run
+```
+
+**Manual Build:**
+
+**macOS (Homebrew):**
 ```bash
 brew install sdl2 sdl2_ttf cmake
+./fonts/download_fonts.sh  # Download fonts automatically
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(sysctl -n hw.ncpu)
 ```
 
-**Ubuntu/Debian:**
+**Linux (Ubuntu/Debian):**
 ```bash
-sudo apt-get install libsdl2-dev libsdl2-ttf-dev cmake g++
-```
-
-**Windows:**
-```bash
-vcpkg install sdl2 sdl2-ttf
-```
-
-### Build & Run
-
-```bash
-cd desktop_emulator
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
-./build/PocketMage_Desktop_Emulator
+sudo apt-get install libsdl2-dev libsdl2-ttf-dev cmake curl
+./fonts/download_fonts.sh  # Download fonts automatically
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
 ```
 
 ### E-ink Simulation Mode
@@ -206,6 +219,7 @@ desktop_emulator/
 ├── fonts/                  # Bundled fonts (cross-platform)
 │   ├── DejaVuSans.ttf     # Primary UI font
 │   ├── DejaVuSansMono.ttf # Monospace font
+│   ├── download_fonts.sh  # Automatic font downloader script
 │   └── README.md          # Font licensing information
 ├── data/                   # Data files directory
 │   ├── pokemon/           # Pokémon database files
