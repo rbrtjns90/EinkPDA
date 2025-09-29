@@ -698,6 +698,8 @@ void processKB_PERIODIC() {
     u8g2.clearBuffer();
     u8g2.sendBuffer();
 #endif
+    // CRITICAL: Return immediately to prevent further rendering after app exit
+    return;
   }
   else if (inchar == 9) {  // TAB - cycle views (future)
     // TODO: Implement view cycling
