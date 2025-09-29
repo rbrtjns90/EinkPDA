@@ -138,10 +138,16 @@ bool DesktopDisplay::init() {
 
     // Load fonts
     const char* fontPaths[] = {
-        "/System/Library/Fonts/Helvetica.ttc",
-        "/System/Library/Fonts/Arial.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/TTF/arial.ttf"
+        // Bundled fonts (cross-platform)
+        "fonts/DejaVuSans.ttf",
+        "fonts/DejaVuSansMono.ttf",
+        // System fonts (fallback)
+        "/System/Library/Fonts/Helvetica.ttc",        // macOS
+        "/System/Library/Fonts/Arial.ttf",            // macOS
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", // Linux
+        "/usr/share/fonts/TTF/arial.ttf",             // Linux
+        "C:/Windows/Fonts/arial.ttf",                 // Windows
+        "C:/Windows/Fonts/calibri.ttf"                // Windows
     };
     
     for (const char* path : fontPaths) {
