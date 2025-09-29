@@ -4,10 +4,6 @@ A comprehensive SDL2-based desktop emulator for the PocketMage handheld E-ink PD
 
 ![PocketMage Home Screen](home.png)
 
-## Overview
-
-PocketMage is a retro-inspired handheld computing device with an E-ink display that provides a unique writing and productivity experience. This emulator brings the complete PocketMage experience to your desktop, allowing you to explore all features of this fascinating handheld device without requiring physical hardware.
-
 ## Quick Start
 
 ### Prerequisites
@@ -46,7 +42,7 @@ export POCKETMAGE_EINK_SIM=1
 ./build/PocketMage_Desktop_Emulator
 ```
 
-**E-ink Simulation Features:**
+**E-ink Simulation Features:** (Work in Progress)
 - **Realistic Refresh Patterns**: Simulates actual E-ink display refresh behavior
 - **Ghosting Effects**: Configurable ghosting simulation (0.02f-0.12f intensity)
 - **Refresh Timing**: Full refresh (~450ms) and partial refresh (~150ms) simulation
@@ -58,41 +54,6 @@ export POCKETMAGE_EINK_SIM=1
 - **F7**: Cycle partial ghosting level (0 → 0.04 → 0.08 → 0.12 → 0)
 - **F8**: Toggle wipe stripe width (18px ↔ 10px)
 
-## Key Features
-
-### 🏠 **Home Screen & Navigation**
-- Clean, icon-based interface optimized for E-ink displays
-- Command-line style navigation
-- Quick access to all applications via keyboard shortcuts
-
-### 📝 **Text Editor**
-- Full-featured text editor with multiple font options
-- Dynamic text wrapping and scrolling
-- File management integration
-- Auto-save functionality
-
-### 📁 **File Wizard**
-- Browse and manage files on the virtual SD card
-- Create, rename, copy, and delete files
-- Integrated with text editor for seamless file operations
-
-### 📋 **Task Manager**
-- Create and manage tasks with due dates
-- Priority system for task organization
-- Visual task tracking on the home screen
-
-### 📅 **Calendar**
-- Full calendar view with event support
-- Date-based navigation
-- Integration with task management
-
-### 📖 **Journal**
-- Daily journaling with automatic date-based file creation
-- Year-view calendar showing journaled days
-- Quick access to today's journal entry
-
-### 🔍 **Pokédex Application**
-The crown jewel of PocketMage is its fully functional Pokédex featuring:
 
 #### **Pokédex Features:**
 - **Complete Pokémon Database**: All Generation 1 Pokémon with detailed information
@@ -104,19 +65,11 @@ The crown jewel of PocketMage is its fully functional Pokédex featuring:
 ![Pokédex Application](pokedex.png)
 *The Pokédex showing the complete list of Generation 1 Pokémon with sprites and navigation*
 
-### ⚛️ **Periodic Table**
+### **Periodic Table**
 Interactive periodic table of elements with detailed information:
 
 ![Periodic Table](periodic_table.png)
 *Complete periodic table with element selection and detailed information display*
-
-#### **Pokédex Data:**
-Each Pokémon entry includes:
-- **Basic Information**: National Dex number, name, type(s)
-- **Physical Stats**: Height, weight, and species classification
-- **Battle Stats**: HP, Attack, Defense, Special Attack, Special Defense, Speed
-- **Pokédex Entry**: Official flavor text descriptions
-- **Visual Elements**: Stat bars and organized layout
 
 #### **Pokédex Navigation:**
 - `↑/↓` - Navigate through Pokémon list
@@ -125,12 +78,7 @@ Each Pokémon entry includes:
 - `←/→` - Browse between Pokémon in detail view
 - `ESC` - Return to home screen
 
-### ⚙️ **Settings**
-- Customizable display and behavior options
-- Power management settings
-- System configuration
-
-## 🎨 Image to Icon Converter
+## Image to Icon Converter
 
 PocketMage includes a powerful `image_to_icon` utility for creating custom 40x40 pixel icons from any image:
 
@@ -225,7 +173,7 @@ PocketMage features a unique dual-display setup:
 | Space | Space character | 32 |
 | Close Window | Quit emulator | - |
 
-### E-ink Simulation Hotkeys
+### E-ink Simulation Hotkeys (Work in Progress)
 
 | Key | Function |
 |-----|----------|
@@ -270,23 +218,6 @@ desktop_emulator/
 └── build/                 # Build output directory
 ```
 
-## Applications Deep Dive
-
-### Pokédex Implementation
-The Pokédex is implemented as a complete application with three main states:
-1. **List View**: Scrollable list of all Pokémon
-2. **Detail View**: Comprehensive Pokémon information
-3. **Search Mode**: Real-time name-based searching
-
-The data is loaded from optimized binary files for quick access, with fallback to sample data for demonstration purposes.
-
-### E-ink Optimization
-All applications are designed for E-ink displays with:
-- **Minimal Refreshes**: Updates only changed screen regions
-- **High Contrast**: Black and white graphics optimized for E-ink
-- **Readable Fonts**: Multiple font options for different viewing preferences
-- **Efficient Layouts**: Information density optimized for small screens
-
 ## Data Sources
 
 ### Pokémon Data
@@ -297,15 +228,6 @@ The Pokédex uses data scraped from the official PokéAPI, including:
 - Complete type and species data
 
 For more information about the Pokémon data collection, see [README_pokemon_scraper.md](README_pokemon_scraper.md).
-
-## Contributing
-
-This project welcomes contributions! Areas of interest include:
-- Additional Pokémon generations
-- New applications and features
-- UI/UX improvements
-- Performance optimizations
-- Hardware compatibility
 
 ## Development Workflow
 
@@ -324,19 +246,6 @@ The emulator provides complete implementations for:
 - **Sensors**: Battery, touch slider, RTC with realistic behavior
 - **Communication**: Serial, preferences with file-based storage
 
-## Technical Implementation
-
-### Display System
-- **Dual Windows**: Separate SDL2 windows for E-Ink and OLED displays
-- **Software Rendering**: Uses SDL_RENDERER_SOFTWARE to prevent Metal GPU crashes on macOS
-- **UTF-8 Support**: Proper character encoding for international text
-- **Real-time Updates**: Immediate visual feedback for all drawing operations
-
-### Input Handling
-- **Arrow Key Navigation**: Proper ASCII mapping (19=UP, 21=DOWN, 20=LEFT, 18=RIGHT)
-- **Visual Selection**: Inverted color highlighting for selected items
-- **Text Input**: Full keyboard support with special character handling
-
 ## Troubleshooting
 
 **Font Issues**: The emulator tries to load system fonts. If text doesn't appear:
@@ -347,8 +256,6 @@ The emulator provides complete implementations for:
 **Build Errors**: Ensure SDL2 and SDL2_ttf development libraries are installed.
 
 **Performance**: The emulator runs at ~30 FPS. Adjust the delay in `main_new.cpp` if needed.
-
-**Metal GPU Crashes**: The emulator uses software-only rendering to prevent macOS Metal GPU assertion failures.
 
 ## Data Directory
 
@@ -368,24 +275,8 @@ To add support for more PocketMage features:
 1. Add implementations in `pocketmage_compat.h` and hardware abstraction files
 2. Update the display interface in `desktop_display_sdl2.h/cpp`  
 3. Modify `main_new.cpp` to include your app's logic
-4. Rebuild and test
-
-## Contributing
-
-This project welcomes contributions! Areas of interest include:
-- Additional Pokémon generations
-- New applications and features
-- UI/UX improvements
-- Performance optimizations
-- Hardware compatibility
 
 ## Acknowledgments
 
 - **PokéAPI**: For providing comprehensive Pokémon data
 - **Periodic Table JSON**: For comprehensive periodic table data - https://github.com/Bowserinator/Periodic-Table-JSON
-- **E-ink Community**: For display technology insights
-- **Retro Computing Enthusiasts**: For inspiration and feedback
-
----
-
-*PocketMage represents the perfect fusion of retro computing aesthetics with modern functionality, bringing the joy of handheld computing to a new generation while honoring the classics that came before.*
