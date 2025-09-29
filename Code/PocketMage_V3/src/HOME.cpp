@@ -271,8 +271,7 @@ void einkHandler_HOME() {
     case HOME_HOME:
       if (newState) {
         newState = false;
-        drawHome();
-        refresh();
+        drawHome(); // drawHome() already handles clearing and refreshing
         //multiPassRefesh(2);
       }
       break;
