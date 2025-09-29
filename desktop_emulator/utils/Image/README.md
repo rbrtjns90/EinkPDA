@@ -4,7 +4,7 @@ C++ utilities to convert PNG/JPEG images to C bitmap arrays for use in PocketMag
 
 ## Tools
 
-### 1. `image_to_icon` - PocketMage Icon Converter ⭐
+### 1. `image_to_icon` - PocketMage Icon Converter 
 **Enhanced converter specifically designed for PocketMage 40x40 pixel icons**
 
 Features:
