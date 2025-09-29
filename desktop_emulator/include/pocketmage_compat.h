@@ -446,14 +446,23 @@ public:
     }
     void setRotation(uint8_t r) {}
     void setTextColor(uint16_t color) { text_color = color; }
-    void setFullWindow() {}
+    void setFullWindow() {
+        // Prepare for full window update - this is called before display()
+        // The actual refresh happens in display() method
+    }
     void fillScreen(uint16_t color) {
         if (g_display) {
             g_display->einkClear(); // This already calls einkForceFullRefresh()
         }
     }
     void display(bool partial = false) {
-        if (g_display) g_display->einkRefresh();
+        if (g_display) {
+            if (partial) {
+                g_display->einkPartialRefresh();
+            } else {
+                g_display->einkForceFullRefresh(); // Force full refresh for complete clearing
+            }
+        }
     }
     void hibernate() {}
     void nextPage() {}

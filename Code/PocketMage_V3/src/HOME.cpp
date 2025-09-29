@@ -335,7 +335,10 @@ void einkHandler_HOME() {
 
 void drawHome() {
   display.setRotation(3);
+  // Clear screen using the same pattern as PERIODIC app
   display.fillScreen(GxEPD_WHITE);
+  refresh();
+  delay(10);  // Ensure Metal command buffer completion
   
   int16_t x1, y1;
   uint16_t charWidth, charHeight;
