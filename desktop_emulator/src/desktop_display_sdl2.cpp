@@ -405,10 +405,6 @@ void DesktopDisplay::einkPartialRefresh() { updateEinkTexture(); }
 void DesktopDisplay::einkForceFullRefresh() {
     if (!einkTexture || !einkRenderer) return;
     
-    // Clear renderer first to prevent artifacts
-    SDL_SetRenderDrawColor(einkRenderer, 255, 255, 255, 255);
-    SDL_RenderClear(einkRenderer);
-    
     void* pixels; int pitch;
     if (SDL_LockTexture(einkTexture, nullptr, &pixels, &pitch) != 0) {
         std::cerr << "[SDL2] Failed to lock E-Ink texture: " << SDL_GetError() << std::endl;
@@ -426,6 +422,13 @@ void DesktopDisplay::einkForceFullRefresh() {
     }
     SDL_UnlockTexture(einkTexture);
     
+    // Ensure viewport is properly set for software renderer
+    SDL_Rect viewport = {0, 0, EINK_WIDTH, EINK_HEIGHT};
+    SDL_RenderSetViewport(einkRenderer, &viewport);
+    
+    // Clear renderer first to prevent artifacts
+    SDL_SetRenderDrawColor(einkRenderer, 255, 255, 255, 255);
+    SDL_RenderClear(einkRenderer);
     SDL_RenderCopy(einkRenderer, einkTexture, nullptr, nullptr);
     SDL_RenderPresent(einkRenderer);
 }
@@ -725,6 +728,10 @@ void DesktopDisplay::updateEinkTexture() {
         std::memcpy(&prevBuf[y * EINK_WIDTH], src, EINK_WIDTH);
     }
     SDL_UnlockTexture(einkTexture);
+    
+    // Ensure viewport is properly set for software renderer
+    SDL_Rect viewport = {0, 0, EINK_WIDTH, EINK_HEIGHT};
+    SDL_RenderSetViewport(einkRenderer, &viewport);
     
     // Clear renderer to prevent artifacts
     SDL_SetRenderDrawColor(einkRenderer, 255, 255, 255, 255);
