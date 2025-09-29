@@ -6,7 +6,7 @@
 #error "desktop_display_sdl2_linux.cpp is Linux-only. Guard your CMake to compile this on Linux."
 #endif
 
-#include "desktop_display.h"
+#include "desktop_display_sdl2.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
