@@ -38,11 +38,35 @@ make -j$(sysctl -n hw.ncpu)
 
 **Linux (Ubuntu/Debian):**
 ```bash
-sudo apt-get install libsdl2-dev libsdl2-ttf-dev cmake curl
+sudo apt-get install libsdl2-dev libsdl2-ttf-dev cmake curl g++
 ./fonts/download_fonts.sh  # Download fonts automatically
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
+```
+
+**Windows:**
+If vcpkg isn't installed, first install git from https://git-scm.com/downloads/win
+
+Check your git version:
+```bash
+git --version
+```
+
+Install vcpkg and SDL2:
+```bash
+git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
+C:\vcpkg\bootstrap-vcpkg.bat
+vcpkg install sdl2 sdl2-ttf:x64-windows
+```
+
+### Build & Run
+
+```bash
+cd desktop_emulator
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+./build/Release/PocketMage_Desktop_Emulator
 ```
 
 ### E-ink Simulation Mode
@@ -259,8 +283,8 @@ The emulator provides complete implementations for:
 
 **Font Issues**: The emulator includes bundled DejaVu fonts for cross-platform compatibility. If text doesn't appear:
 - Ensure the `fonts/` directory exists with `DejaVuSans.ttf` and `DejaVuSansMono.ttf`
+- Run `./fonts/download_fonts.sh` to download missing fonts automatically
 - The emulator automatically falls back to system fonts if bundled fonts aren't found
-- No additional font installation required
 
 **Build Errors**: Ensure SDL2 and SDL2_ttf development libraries are installed.
 
