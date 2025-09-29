@@ -551,8 +551,16 @@ String vectorToString() {
 }
 
 void updateBattState() {
-    std::cout << "[BATTERY] Battery state updated" << std::endl;
-    // Mock battery state update
+    // Only log battery updates once per minute to reduce terminal spam
+    static unsigned long lastBatteryLog = 0;
+    unsigned long currentTime = millis();
+    
+    if (currentTime - lastBatteryLog >= 60000) { // 60 seconds = 60000 milliseconds
+        std::cout << "[BATTERY] Battery state updated (periodic check)" << std::endl;
+        lastBatteryLog = currentTime;
+    }
+    
+    // Mock battery state update (still happens every call, just logging is limited)
 }
 
 void setTimeFromString(String timeStr) {
@@ -668,10 +676,6 @@ bool SD_MMCClass::rename(const String& path1, const String& path2) {
     return rename(path1.c_str(), path2.c_str());
 }
 
-// Missing function stubs for linker
-// removeChar function removed - implemented in real PocketMage source
-
-// refresh() function removed - already defined earlier
 
 void oledScroll() {
     // Mock OLED scroll function
