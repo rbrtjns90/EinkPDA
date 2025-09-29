@@ -1,12 +1,12 @@
 // Windows-only SDL2 display backend for PocketMage Emulator
 // Builds on Windows with SDL2 + SDL2_ttf installed.
-// Implements DesktopDisplay declared in desktop_display.h
+// Implements DesktopDisplay declared in desktop_display_sdl2.h
 
 #if !defined(_WIN32)
 #error "desktop_display_sdl2_windows.cpp is Windows-only. Guard your CMake to compile this on Windows."
 #endif
 
-#include "desktop_display.h"
+#include "desktop_display_sdl2.h"
 #include "pocketmage_compat.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>

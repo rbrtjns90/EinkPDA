@@ -1,6 +1,6 @@
 // Linux-only SDL2 display backend for PocketMage Emulator
 // Builds on Linux distros with SDL2 + SDL2_ttf installed.
-// Implements DesktopDisplay declared in desktop_display.h
+// Implements DesktopDisplay declared in desktop_display_sdl2.h
 
 #if !defined(__linux__)
 #error "desktop_display_sdl2_linux.cpp is Linux-only. Guard your CMake to compile this on Linux."
