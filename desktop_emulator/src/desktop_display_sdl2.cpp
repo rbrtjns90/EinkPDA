@@ -53,6 +53,8 @@ bool DesktopDisplay::init() {
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
     SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1");
     SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
+    SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, "0");
+    SDL_SetHint(SDL_HINT_RENDER_BATCHING, "0");
     
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         std::cerr << "[SDL2] SDL_Init failed: " << SDL_GetError() << std::endl;
@@ -401,10 +403,12 @@ void DesktopDisplay::einkRefresh() { updateEinkTexture(); }
 void DesktopDisplay::einkPartialRefresh() { updateEinkTexture(); }
 
 void DesktopDisplay::einkForceFullRefresh() {
-    // Force a complete screen update by clearing the comparison buffer
     if (!einkTexture || !einkRenderer) return;
     
-    // Upload entire screen (ignore dirty detection)
+    // Clear renderer first to prevent artifacts
+    SDL_SetRenderDrawColor(einkRenderer, 255, 255, 255, 255);
+    SDL_RenderClear(einkRenderer);
+    
     void* pixels; int pitch;
     if (SDL_LockTexture(einkTexture, nullptr, &pixels, &pitch) != 0) {
         std::cerr << "[SDL2] Failed to lock E-Ink texture: " << SDL_GetError() << std::endl;
@@ -422,11 +426,6 @@ void DesktopDisplay::einkForceFullRefresh() {
     }
     SDL_UnlockTexture(einkTexture);
     
-    // Ensure viewport is set
-    SDL_Rect viewport = {0, 0, EINK_WIDTH, EINK_HEIGHT};
-    SDL_RenderSetViewport(einkRenderer, &viewport);
-    
-    SDL_RenderClear(einkRenderer);
     SDL_RenderCopy(einkRenderer, einkTexture, nullptr, nullptr);
     SDL_RenderPresent(einkRenderer);
 }
@@ -727,10 +726,8 @@ void DesktopDisplay::updateEinkTexture() {
     }
     SDL_UnlockTexture(einkTexture);
     
-    // Ensure viewport is set (some SDL paths require this)
-    SDL_Rect viewport = {0, 0, EINK_WIDTH, EINK_HEIGHT};
-    SDL_RenderSetViewport(einkRenderer, &viewport);
-    
+    // Clear renderer to prevent artifacts
+    SDL_SetRenderDrawColor(einkRenderer, 255, 255, 255, 255);
     SDL_RenderClear(einkRenderer);
     SDL_RenderCopy(einkRenderer, einkTexture, nullptr, nullptr);
     SDL_RenderPresent(einkRenderer);
