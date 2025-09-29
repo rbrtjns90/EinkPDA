@@ -471,6 +471,9 @@ void processKB_POKEDEX() {
         newState = true;
         doFull = true;  // Force full refresh on next draw
         CurrentKBState = NORMAL;
+        
+        // CRITICAL: Return immediately to prevent further Pokemon rendering
+        return;
       }
     }
     
