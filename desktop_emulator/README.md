@@ -19,17 +19,32 @@ sudo apt-get install libsdl2-dev libsdl2-ttf-dev cmake g++
 ```
 
 **Windows:**
+If vcpkg isn't installed, have git. If not install git by navigating to -> https://git-scm.com/downloads/win
+and using the installer. 
+
+Check your git version
+
+```bash
+git --version
+```
+
+```bash
+git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
+C:\vcpkg\bootstrap-vcpkg.bat
+```
+
 ```bash
 vcpkg install sdl2 sdl2-ttf
+vcokg install sdl2:x64-windows sdl2-ttf:x64-windows 
 ```
+It will install a version of Powershell-core if a suitable version is not found (required v7,5.3)
 
 ### Build & Run
 
 ```bash
 cd desktop_emulator
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
-./build/PocketMage_Desktop_Emulator
+./build.bat
+./build/Releaae/PocketMage_Desktop_Emulator
 ```
 
 ### E-ink Simulation Mode
@@ -203,10 +218,6 @@ desktop_emulator/
 │   ├── main_new.cpp        # Main emulator entry point
 │   ├── desktop_display_sdl2.cpp # SDL2 implementation
 │   └── hardware_shim.cpp   # Mock hardware functions
-├── fonts/                  # Bundled fonts (cross-platform)
-│   ├── DejaVuSans.ttf     # Primary UI font
-│   ├── DejaVuSansMono.ttf # Monospace font
-│   └── README.md          # Font licensing information
 ├── data/                   # Data files directory
 │   ├── pokemon/           # Pokémon database files
 │   ├── journal/           # Journal entries
@@ -243,10 +254,10 @@ The emulator provides complete implementations for:
 
 ## Troubleshooting
 
-**Font Issues**: The emulator includes bundled DejaVu fonts for cross-platform compatibility. If text doesn't appear:
-- Ensure the `fonts/` directory exists with `DejaVuSans.ttf` and `DejaVuSansMono.ttf`
-- The emulator automatically falls back to system fonts if bundled fonts aren't found
-- No additional font installation required
+**Font Issues**: The emulator tries to load system fonts. If text doesn't appear:
+- macOS: Ensure Monaco font is available
+- Linux: Install DejaVu fonts (`sudo apt-get install fonts-dejavu`)
+- Windows: Update font paths in `desktop_display_sdl2.cpp`
 
 **Build Errors**: Ensure SDL2 and SDL2_ttf development libraries are installed.
 
