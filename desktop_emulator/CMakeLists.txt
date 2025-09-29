@@ -77,22 +77,20 @@ set(EMULATOR_SOURCES
   src/oled_service.cpp
   src/text_utils_desktop.cpp
 )
-
 # Platform-specific display backend
 if(WIN32)
   message(STATUS "Building for Windows - using Windows-specific display backend")
   list(APPEND EMULATOR_SOURCES src/desktop_display_sdl2_windows.cpp)
 elseif(UNIX AND NOT APPLE)
-  message(STATUS "Building for Linux - using Linux-specific display backend")
-  list(APPEND EMULATOR_SOURCES src/desktop_display_sdl2_linux.cpp)
+  message(STATUS "Building for Linux - using cross-platform display backend")
+  list(APPEND EMULATOR_SOURCES src/desktop_display_sdl2.cpp)
 elseif(APPLE)
-  message(STATUS "Building for macOS - using Mac display backend")
+  message(STATUS "Building for macOS - using cross-platform display backend")
   list(APPEND EMULATOR_SOURCES src/desktop_display_sdl2.cpp)
 else()
   message(STATUS "Building for unknown platform - using cross-platform display backend")
   list(APPEND EMULATOR_SOURCES src/desktop_display_sdl2.cpp)
 endif()
-
 add_executable(${PROJECT_NAME}
   ${EMULATOR_SOURCES}
   ${POCKETMAGE_SOURCES_MANUAL}

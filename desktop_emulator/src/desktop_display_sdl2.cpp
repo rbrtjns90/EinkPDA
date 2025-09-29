@@ -47,128 +47,161 @@ DesktopDisplay::~DesktopDisplay() {
 }
 
 bool DesktopDisplay::init() {
-    DEBUG_LOG("SDL2", "Initializing DesktopDisplay...");
-    
+    DEBUG_LOG("SDL2", "Initializing DesktopDisplay (cross-platform)...");
+
+    // ---------- Platform hints ----------
+#if defined(_WIN32)
+    SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+    SDL_SetHint(SDL_HINT_WINDOWS_ENABLE_MESSAGELOOP, "1"); // safer key delivery while blocked
+    // Try D3D11 first; we will still fall back to software below.
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "direct3d11");
+#elif defined(__linux__)
+    // Taming common tearing/compositor issues on Linux/X11/Wayland
+    SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
+    SDL_SetHint(SDL_HINT_VIDEO_WAYLAND_PREFER_LIBDECOR, "1");
+    // Prefer GL (works on most drivers) but we'll fall back to software if needed.
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+#else
+    // macOS - use software for stability (as before)
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
-    SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1");
-    SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
     SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, "0");
+#endif
+
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0"); // nearest-neighbor
+    SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "0"); // let SDL manage DPI
+    SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0"); // we present tiny frames; avoid device stalls
     SDL_SetHint(SDL_HINT_RENDER_BATCHING, "0");
-    
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) < 0) {
         std::cerr << "[SDL2] SDL_Init failed: " << SDL_GetError() << std::endl;
         return false;
     }
-    
-    SDL_StartTextInput();
-
     if (TTF_Init() == -1) {
         std::cerr << "[SDL2] TTF_Init failed: " << TTF_GetError() << std::endl;
         SDL_Quit();
         return false;
     }
-    einkWindow = SDL_CreateWindow("PocketMage E-Ink Display",
-                                  SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                                  EINK_WIDTH * EINK_WINDOW_SCALE, EINK_HEIGHT * EINK_WINDOW_SCALE,
-                                  SDL_WINDOW_SHOWN);
-    if (!einkWindow) {
-        std::cerr << "[SDL2] Failed to create E-Ink window: " << SDL_GetError() << std::endl;
-        cleanup();
-        return false;
-    }
+    SDL_StartTextInput();
 
-    einkRenderer = SDL_CreateRenderer(einkWindow, -1, SDL_RENDERER_SOFTWARE);
-    if (!einkRenderer) {
-        std::cerr << "[SDL2] Failed to create E-Ink software renderer: " << SDL_GetError() << std::endl;
-        cleanup();
-        return false;
-    }
-    
+    auto create_window = [](const char* title, int w, int h) -> SDL_Window* {
+        return SDL_CreateWindow(
+            title,
+            SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+            w * 3, h * 3, // Use 3x scale factor
+            SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE
+        );
+    };
+
+    einkWindow = create_window("PocketMage E-Ink Display", EINK_WIDTH, EINK_HEIGHT);
+    if (!einkWindow) { std::cerr << SDL_GetError() << "\n"; cleanup(); return false; }
+
+    oledWindow = create_window("PocketMage OLED Display", OLED_WIDTH, OLED_HEIGHT);
+    if (!oledWindow) { std::cerr << SDL_GetError() << "\n"; cleanup(); return false; }
+
+    auto create_renderer_with_fallback = [](SDL_Window* w) -> SDL_Renderer* {
+        // Try accelerated (D3D/GL) without vsync; then fall back to software.
+        SDL_Renderer* r = SDL_CreateRenderer(w, -1,
+            SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
+        if (!r) r = SDL_CreateRenderer(w, -1, SDL_RENDERER_SOFTWARE);
+        return r;
+    };
+
+    einkRenderer = create_renderer_with_fallback(einkWindow);
+    if (!einkRenderer) { std::cerr << "[SDL2] E-Ink renderer fail: " << SDL_GetError() << "\n"; cleanup(); return false; }
+
+    oledRenderer = create_renderer_with_fallback(oledWindow);
+    if (!oledRenderer) { std::cerr << "[SDL2] OLED renderer fail: " << SDL_GetError() << "\n"; cleanup(); return false; }
+
+    // Log renderer info
     SDL_RendererInfo info;
     if (SDL_GetRendererInfo(einkRenderer, &info) == 0) {
         std::cout << "[SDL2] E-Ink renderer: " << info.name << " (flags: " << info.flags << ")" << std::endl;
     }
-    
+    if (SDL_GetRendererInfo(oledRenderer, &info) == 0) {
+        std::cout << "[SDL2] OLED renderer: " << info.name << " (flags: " << info.flags << ")" << std::endl;
+    }
+
+    // Logical size + integer scale ensures crisp pixels and resize-safety
     SDL_RenderSetLogicalSize(einkRenderer, EINK_WIDTH, EINK_HEIGHT);
     SDL_RenderSetIntegerScale(einkRenderer, SDL_TRUE);
-    oledWindow = SDL_CreateWindow("PocketMage OLED Display",
-                                  SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED + (EINK_HEIGHT * EINK_WINDOW_SCALE) + 50,
-                                  OLED_WIDTH * OLED_WINDOW_SCALE, OLED_HEIGHT * OLED_WINDOW_SCALE,
-                                  SDL_WINDOW_SHOWN);
-    if (!oledWindow) {
-        std::cerr << "[SDL2] Failed to create OLED window: " << SDL_GetError() << std::endl;
-        cleanup();
-        return false;
-    }
-
-    oledRenderer = SDL_CreateRenderer(oledWindow, -1, SDL_RENDERER_SOFTWARE);
-    if (!oledRenderer) {
-        std::cerr << "[SDL2] Failed to create OLED software renderer: " << SDL_GetError() << std::endl;
-        cleanup();
-        return false;
-    }
-    
-    SDL_RendererInfo oledInfo;
-    if (SDL_GetRendererInfo(oledRenderer, &oledInfo) == 0) {
-        std::cout << "[SDL2] OLED renderer: " << oledInfo.name << " (flags: " << oledInfo.flags << ")" << std::endl;
-    }
-    
     SDL_RenderSetLogicalSize(oledRenderer, OLED_WIDTH, OLED_HEIGHT);
     SDL_RenderSetIntegerScale(oledRenderer, SDL_TRUE);
-    einkTexture = SDL_CreateTexture(einkRenderer, SDL_PIXELFORMAT_ARGB8888, 
+
+    // Streaming textures (ARGB8888) – same format your update paths already use
+    einkTexture = SDL_CreateTexture(einkRenderer, SDL_PIXELFORMAT_ARGB8888,
                                     SDL_TEXTUREACCESS_STREAMING, EINK_WIDTH, EINK_HEIGHT);
-    if (!einkTexture) {
-        std::cerr << "[SDL2] Failed to create E-Ink texture: " << SDL_GetError() << std::endl;
-        cleanup();
-        return false;
-    }
+    if (!einkTexture) { std::cerr << "[SDL2] E-Ink texture fail: " << SDL_GetError() << "\n"; cleanup(); return false; }
 
-    oledTexture = SDL_CreateTexture(oledRenderer, SDL_PIXELFORMAT_ARGB8888, 
+    oledTexture = SDL_CreateTexture(oledRenderer, SDL_PIXELFORMAT_ARGB8888,
                                     SDL_TEXTUREACCESS_STREAMING, OLED_WIDTH, OLED_HEIGHT);
-    if (!oledTexture) {
-        std::cerr << "[SDL2] Failed to create OLED texture: " << SDL_GetError() << std::endl;
-        cleanup();
-        return false;
-    }
+    if (!oledTexture) { std::cerr << "[SDL2] OLED texture fail: " << SDL_GetError() << "\n"; cleanup(); return false; }
 
-    // Initialize framebuffers
-    einkBuffer.assign(EINK_WIDTH * EINK_HEIGHT, 255); // White background for E‑Ink
-    oledBuffer.assign(OLED_WIDTH * OLED_HEIGHT, 0);   // Black background for OLED
+    // Initialize framebuffers (same policy as before)
+    einkBuffer.assign(EINK_WIDTH * EINK_HEIGHT, 255); // white
+    oledBuffer.assign(OLED_WIDTH * OLED_HEIGHT, 0);   // black
 
-    // Load fonts
-    const char* fontPaths[] = {
+    // --------- Fonts (OS-specific search paths) ---------
+    auto try_open_font = [](const std::vector<std::string>& candidates, int pt) -> TTF_Font* {
+        for (const auto& p : candidates) {
+            if (auto* f = TTF_OpenFont(p.c_str(), pt)) return f;
+        }
+        return nullptr;
+    };
+
+#if defined(_WIN32)
+    const std::vector<std::string> fontPref12 = {
         // Bundled fonts (cross-platform)
         "fonts/DejaVuSans.ttf",
         "fonts/DejaVuSansMono.ttf",
         // System fonts (fallback)
-        "/System/Library/Fonts/Helvetica.ttc",        // macOS
-        "/System/Library/Fonts/Arial.ttf",            // macOS
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", // Linux
-        "/usr/share/fonts/TTF/arial.ttf",             // Linux
-        "C:/Windows/Fonts/arial.ttf",                 // Windows
-        "C:/Windows/Fonts/calibri.ttf"                // Windows
+        "C:\\Windows\\Fonts\\segoeui.ttf",
+        "C:\\Windows\\Fonts\\consola.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf"
     };
-    
-    for (const char* path : fontPaths) {
-        font = TTF_OpenFont(path, 12);
-        if (font) {
-            std::cout << "[SDL2] Loaded font: " << path << std::endl;
-            break;
-        }
-    }
-    
-    for (const char* path : fontPaths) {
-        smallFont = TTF_OpenFont(path, 8);
-        if (smallFont) break;
-    }
-    
+    const std::vector<std::string> fontPref08 = fontPref12;
+#elif defined(__linux__)
+    const std::vector<std::string> fontPref12 = {
+        // Bundled fonts (cross-platform)
+        "fonts/DejaVuSans.ttf",
+        "fonts/DejaVuSansMono.ttf",
+        // System fonts (fallback)
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+    };
+    const std::vector<std::string> fontPref08 = fontPref12;
+#else
+    // macOS
+    const std::vector<std::string> fontPref12 = { 
+        // Bundled fonts (cross-platform)
+        "fonts/DejaVuSans.ttf",
+        "fonts/DejaVuSansMono.ttf",
+        // System fonts (fallback)
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/System/Library/Fonts/Arial.ttf"
+    };
+    const std::vector<std::string> fontPref08 = fontPref12;
+#endif
+
+    font      = try_open_font(fontPref12, 12);
+    smallFont = try_open_font(fontPref08,  8);
     if (!font) {
-        std::cerr << "[SDL2] Warning: Could not load any font" << std::endl;
+        std::cerr << "[SDL2] Warning: no UI font available; text drawing will no-op\n";
+    } else {
+        std::cout << "[SDL2] Font loaded successfully" << std::endl;
     }
 
-    DEBUG_LOG("SDL2", "DesktopDisplay initialized successfully");
-    
+    // Initial clears + present
+    SDL_SetRenderDrawColor(einkRenderer, 255, 255, 255, 255);
+    SDL_RenderClear(einkRenderer);
+    SDL_RenderPresent(einkRenderer);
+
+    SDL_SetRenderDrawColor(oledRenderer, 0, 0, 0, 255);
+    SDL_RenderClear(oledRenderer);
+    SDL_RenderPresent(oledRenderer);
+
+    DEBUG_LOG("SDL2", "DesktopDisplay initialized (cross-platform)");
     return true;
 }
 
@@ -676,6 +709,15 @@ bool DesktopDisplay::handleEvents() {
             keyPressed[e.key.keysym.scancode] = true;
         } else if (e.type == SDL_KEYUP) {
             keyPressed[e.key.keysym.scancode] = false;
+        } else if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+            // Optional: crisp scaling on manual window resizes (Windows & Linux)
+            if (e.window.windowID == SDL_GetWindowID(einkWindow)) {
+                SDL_RenderSetLogicalSize(einkRenderer, EINK_WIDTH, EINK_HEIGHT);
+                SDL_RenderSetIntegerScale(einkRenderer, SDL_TRUE);
+            } else if (e.window.windowID == SDL_GetWindowID(oledWindow)) {
+                SDL_RenderSetLogicalSize(oledRenderer, OLED_WIDTH, OLED_HEIGHT);
+                SDL_RenderSetIntegerScale(oledRenderer, SDL_TRUE);
+            }
         }
     }
     return true;
