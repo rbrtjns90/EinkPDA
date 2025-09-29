@@ -48,13 +48,12 @@ static int sel_col = -1, sel_row = -1;  // Start with no selection
 static int prev_col = -1, prev_row = -1;  // Previous selection for partial updates
 static uint8_t selZ = 0;  // No element selected initially
 static bool in_detail = false;
-static bool in_search = false;
 static ViewMode viewMode = GRID_VIEW;
 
 // Optional: black-scrub old cell before restoring it (fights ghosting)
 static const bool kBlackScrub = true;
-// Geometry constants for 310x240 E-ink display
-static const int grid_x = 6, grid_y = 30, grid_w = 306, grid_h = 180;
+// Geometry constants for 310x240 E-ink display - maximize screen usage
+static const int grid_x = 5, grid_y = 20, grid_w = 306, grid_h = 216;
 static int col_w, row_h;
 
 // Helper: draw 1px border using only fillRect (avoids buggy drawRect on emulator)
@@ -172,13 +171,17 @@ static void build_layout() {
     const PackedElement& elem = E(z);
     int col, row;
     
-    // Handle f-block elements (Lanthanoids and Actinoids)
+    // Handle f-block elements (Lanthanoids and Actinoids) and super-heavies
     if (z >= 57 && z <= 71) {  // Lanthanoids
       col = z - 57 + 3;  // Start at column 3
-      row = 7;  // Row 7 (0-indexed)
-    } else if (z >= 89 && z <= 103) {  // Actinoids
+      row = 6;  // Row 6 (below main table)
+    } else if (z >= 89 && z <= 103) {  // Actinoids  
       col = z - 89 + 3;  // Start at column 3
-      row = 8;  // Row 8 (0-indexed)
+      row = 7;  // Row 7 (below lanthanoids)
+    } else if (z >= 104 && z <= 118) {
+      // Handle super-heavy elements 104-118 in their own row below actinoids
+      col = z - 104 + 3;  // Start at column 3, elements 104-118 -> columns 3-17  
+      row = 8;  // Row 8 (below actinoids)
     } else {
       // Standard periodic table positioning
       col = elem.group - 1;  // Groups 1-18 -> columns 0-17
@@ -263,8 +266,15 @@ static void paint_table() {
   display.fillScreen(GxEPD_WHITE);
   display.setTextColor(GxEPD_BLACK);
   display.setFont(&FreeMonoBold9pt7b);
-  display.setCursor(10, 15);
-  display.print("Periodic Table");
+  
+  // Center the title on screen (320px wide)
+  const char* title = "Periodic Table";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+  int centered_x = (320 - w) / 2;
+  display.setCursor(centered_x, 15);
+  display.print(title);
 
   // Draw all cells once (only selected one has double border)
   for (int row = 0; row < 9; row++) {
@@ -338,15 +348,12 @@ static inline void drawCellNormal(int col, int row) {
   // 1) Clear ENTIRE cell area to white first (critical!)
   display.fillRect(x, y, col_w, row_h, GxEPD_WHITE);
 
-  // 2) Draw border + black text
+  // 2) Draw border + element symbol only (no atomic numbers)
   display.drawRect(x, y, col_w, row_h, GxEPD_BLACK);
   display.setTextColor(GxEPD_BLACK);
-  display.setFont(&FreeMono12pt7b);
-  display.setCursor(x + 2, y + 12);
+  display.setFont(&Font5x7Fixed);
+  display.setCursor(x + 2, y + (row_h / 2) + 2);
   display.print(get_symbol(cell.z));
-  display.setFont(&FreeMonoBold9pt7b);
-  display.setCursor(x + 1, y + row_h - 2);
-  display.print(cell.z);
 }
 
 // Helper: Draw a selected cell (white interior + double border)
@@ -363,14 +370,11 @@ static inline void drawCellSelected(int col, int row) {
   display.drawRect(x,   y,   col_w,   row_h,   GxEPD_BLACK);
   display.drawRect(x+1, y+1, col_w-2, row_h-2, GxEPD_BLACK);
   
-  // 3) Draw text
+  // 3) Draw element symbol only (no atomic numbers)
   display.setTextColor(GxEPD_BLACK);
-  display.setFont(&FreeMono12pt7b);
-  display.setCursor(x + 2, y + 12);
+  display.setFont(&Font5x7Fixed);
+  display.setCursor(x + 3, y + (row_h / 2) + 2);
   display.print(get_symbol(cell.z));
-  display.setFont(&FreeMonoBold9pt7b);
-  display.setCursor(x + 1, y + row_h - 2);
-  display.print(cell.z);
 }
 
 static void paint_detail() {

@@ -789,10 +789,10 @@ void DesktopDisplay::renderOledText(const std::string& l1,
     // Clear whole OLED buffer once
     std::fill(oledBuffer.begin(), oledBuffer.end(), 0);
 
-    // Draw text with proper baselines and font size (8px font)
-    if (!l1.empty()) oledDrawText(l1, 0, 8, 8);
-    if (!l2.empty()) oledDrawText(l2, 0, 16, 8);
-    if (!l3.empty()) oledDrawText(l3, 0, 24, 8);
+    // Draw text with better positioning to avoid top cutoff (8px font)
+    if (!l1.empty()) oledDrawText(l1, 0, 12, 8);
+    if (!l2.empty()) oledDrawText(l2, 0, 20, 8);
+    if (!l3.empty()) oledDrawText(l3, 0, 28, 8);
 
     // Present once
     updateOledTexture();
