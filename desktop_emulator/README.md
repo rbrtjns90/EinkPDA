@@ -2,7 +2,7 @@
 
 A comprehensive SDL2-based desktop emulator for the PocketMage handheld E-ink PDA device, featuring multiple applications including text editing, file management, task tracking, journaling, and a fully functional Pokédex.
 
-![PocketMage Home Screen](home.jpg)
+![PocketMage Home Screen](home.png)
 
 ## Overview
 
@@ -35,6 +35,28 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ./build/PocketMage_Desktop_Emulator
 ```
+
+### E-ink Simulation Mode
+
+Experience realistic E-ink display behavior with the built-in simulation mode:
+
+```bash
+# Enable E-ink simulation on startup
+export POCKETMAGE_EINK_SIM=1
+./build/PocketMage_Desktop_Emulator
+```
+
+**E-ink Simulation Features:**
+- **Realistic Refresh Patterns**: Simulates actual E-ink display refresh behavior
+- **Ghosting Effects**: Configurable ghosting simulation (0.02f-0.12f intensity)
+- **Refresh Timing**: Full refresh (~450ms) and partial refresh (~150ms) simulation
+- **Visual Effects**: Optional white→black flash during full refreshes
+
+**Runtime Hotkeys:**
+- **F5**: Toggle E-ink simulation ON/OFF
+- **F6**: Force full refresh on next frame
+- **F7**: Cycle partial ghosting level (0 → 0.04 → 0.08 → 0.12 → 0)
+- **F8**: Toggle wipe stripe width (18px ↔ 10px)
 
 ## Key Features
 
@@ -69,8 +91,6 @@ cmake --build build -j
 - Year-view calendar showing journaled days
 - Quick access to today's journal entry
 
-![Journal Application](journal.jpg)
-
 ### 🔍 **Pokédex Application**
 The crown jewel of PocketMage is its fully functional Pokédex featuring:
 
@@ -81,11 +101,14 @@ The crown jewel of PocketMage is its fully functional Pokédex featuring:
 - **Visual Stat Bars**: Graphical representation of Pokémon statistics
 - **Navigation**: Browse through Pokémon with arrow keys
 
-![Pokédex List View](pokedex1.jpg)
-*The Pokédex list view showing numbered Pokémon entries*
+![Pokédex Application](pokedex.png)
+*The Pokédex showing the complete list of Generation 1 Pokémon with sprites and navigation*
 
-![Pokédex Detail View](pokedex2.jpg)
-*Detailed Pokémon information with stats, types, and description*
+### ⚛️ **Periodic Table**
+Interactive periodic table of elements with detailed information:
+
+![Periodic Table](periodic_table.png)
+*Complete periodic table with element selection and detailed information display*
 
 #### **Pokédex Data:**
 Each Pokémon entry includes:
@@ -106,6 +129,57 @@ Each Pokémon entry includes:
 - Customizable display and behavior options
 - Power management settings
 - System configuration
+
+## 🎨 Image to Icon Converter
+
+PocketMage includes a powerful `image_to_icon` utility for creating custom 40x40 pixel icons from any image:
+
+### Features
+- **AUTO-CROPS**: Automatically detects content bounds and removes white space
+- **FILLS SQUARE**: Scales content to use entire 40x40 pixel area for maximum visibility
+- **COLOR INVERSION**: `--invert` flag for negative/positive conversion
+- **SMART SCALING**: Content-aware resizing eliminates empty borders
+
+### Building the Converter
+
+```bash
+cd desktop_emulator/utils/Image
+make image_to_icon
+```
+
+### Usage
+
+```bash
+./image_to_icon <input_image> <output_file> <array_name> [threshold] [--invert]
+```
+
+**Examples:**
+```bash
+# Auto-crop pokeball to 40x40 icon
+./image_to_icon pokeball.png pokeball_icon.h pokeballIcon
+
+# Auto-crop with custom threshold
+./image_to_icon atom.jpg atom_icon.h atomIcon 100
+
+# Auto-crop with color inversion (great for atoms/molecules)
+./image_to_icon hydrogen.png hydrogen_icon.h hydrogenIcon 128 --invert
+
+# Any image becomes a perfect 40x40 PocketMage icon!
+./image_to_icon any_image.png my_icon.h myAppIcon
+```
+
+### Integration with PocketMage
+
+1. **Generate your icon**: `./image_to_icon my_image.png my_icon.h myAppIcon`
+2. **Copy the array**: Copy the generated array from `my_icon.h` to `Code/PocketMage_V3/src/assets.cpp`
+3. **Update the home screen**: Replace an existing icon in the `homeIconsAllArray` with your new icon name
+
+### Tips for Best Results
+- Any image size works - it will auto-crop
+- Use high contrast images for better e-ink display
+- Try `--invert` flag for better contrast (especially atoms, molecules, dark subjects)
+- Adjust threshold (80-180) if needed, but defaults usually work great
+- Simple designs work best on small 40x40 displays
 
 ## Technical Architecture
 
@@ -132,18 +206,33 @@ PocketMage features a unique dual-display setup:
 - SDL2 development libraries
 - Make or CMake build system
 
-## Controls
+## Controls & Navigation
 
-| Desktop Key | PocketMage Function |
-|-------------|-------------------|
-| Arrow Keys  | Navigation (Up/Down/Left/Right) |
-| Enter       | Select/Confirm |
-| Backspace   | Delete/Back |
-| Escape      | Return to home/exit application |
-| Letters     | Text input |
-| Numbers     | Numeric input |
-| Space       | Space character |
-| Close Window| Quit emulator |
+### Keyboard Controls
+
+| Desktop Key | PocketMage Function | ASCII Code |
+|-------------|-------------------|------------|
+| ↑ Arrow Key | Navigate Up | 19 |
+| ↓ Arrow Key | Navigate Down | 21 |
+| ← Arrow Key | Navigate Left | 20 |
+| → Arrow Key | Navigate Right | 18 |
+| Enter | Select/Confirm | 13 |
+| Backspace | Delete/Back | 8 |
+| Escape | Return to home/exit application | 27 |
+| Home | Return to home screen | 12 |
+| Letters | Text input | a-z, A-Z |
+| Numbers | Numeric input | 0-9 |
+| Space | Space character | 32 |
+| Close Window | Quit emulator | - |
+
+### E-ink Simulation Hotkeys
+
+| Key | Function |
+|-----|----------|
+| **F5** | Toggle E-ink simulation ON/OFF |
+| **F6** | Force full refresh on next frame |
+| **F7** | Cycle partial ghosting level (0→0.04→0.08→0.12→0) |
+| **F8** | Toggle wipe stripe width (18px↔10px) |
 
 ### Home Screen Commands
 Type commands and press Enter:
