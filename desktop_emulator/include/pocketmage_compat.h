@@ -449,8 +449,7 @@ public:
     void setFullWindow() {}
     void fillScreen(uint16_t color) {
         if (g_display) {
-            g_display->einkClear();
-            g_display->einkForceFullRefresh(); // Force complete screen update to clear artifacts
+            g_display->einkClear(); // This already calls einkForceFullRefresh()
         }
     }
     void display(bool partial = false) {

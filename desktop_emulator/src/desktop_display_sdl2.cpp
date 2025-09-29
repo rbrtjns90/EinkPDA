@@ -213,9 +213,12 @@ void DesktopDisplay::cleanup() {
 
 // E-Ink display methods
 void DesktopDisplay::einkClear() {
+    DEBUG_LOG("EINK", "einkClear() called - filling buffer with white");
     std::fill(einkBuffer.begin(), einkBuffer.end(), 255);
     // Force complete refresh to ensure screen is cleared, bypassing row-dirty detection
+    DEBUG_LOG("EINK", "Calling einkForceFullRefresh() to clear screen");
     einkForceFullRefresh();
+    DEBUG_LOG("EINK", "Screen clearing complete");
 }
 
 void DesktopDisplay::einkSetPixel(int x, int y, bool black) {
