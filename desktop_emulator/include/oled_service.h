@@ -10,8 +10,8 @@ public:
     static OledService& getInstance();
 
     void setLines(const std::string& l1, const std::string& l2, const std::string& l3);
-    void presentIfDirty();       // call from main thread
-    OledSnapshot getSnapshot();  // optional, for debugging
+    void presentIfDirty();
+    OledSnapshot getSnapshot();
     void clear();
 
 private:
@@ -23,7 +23,7 @@ private:
 
 extern "C" {
     void oled_set_lines(const char* line1, const char* line2, const char* line3);
-    void oled_present_if_dirty(); // main thread only
+    void oled_present_if_dirty();
     void oled_clear();
     void oled_get_snapshot(char* line1, char* line2, char* line3, int* valid);
 }

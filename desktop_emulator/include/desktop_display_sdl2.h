@@ -7,13 +7,11 @@
 #include <vector>
 #include <cstdint>
 
-// ---- Logical device sizes (scale only at the window/renderer level) ----
-constexpr int EINK_WIDTH  = 320;   // Set this to your actual E-Ink width
-constexpr int EINK_HEIGHT = 240;   // Set this to your actual E-Ink height
-constexpr int OLED_WIDTH  = 128;   // SH1106 logical width
-constexpr int OLED_HEIGHT = 32;    // SH1106 logical height
+constexpr int EINK_WIDTH  = 320;
+constexpr int EINK_HEIGHT = 240;
+constexpr int OLED_WIDTH  = 128;
+constexpr int OLED_HEIGHT = 32;
 
-// Window-only scale (do not change logical sizes above)
 constexpr int EINK_WINDOW_SCALE = 3;
 constexpr int OLED_WINDOW_SCALE = 2;
 
@@ -25,7 +23,6 @@ public:
     bool init();
     void cleanup();
     
-    // E‑Ink API
     void einkClear();
     void einkSetPixel(int x, int y, bool black);
     void einkDrawText(const std::string& text, int x, int y, int size, bool whiteText=false);
@@ -36,9 +33,7 @@ public:
     void einkGetTextBounds(const char* text, int x, int y, int16_t* x1, int16_t* y1, uint16_t* w, uint16_t* h);
     void einkRefresh();
     void einkPartialRefresh();
-    void einkForceFullRefresh(); // Force complete screen update
-
-    // OLED API
+    void einkForceFullRefresh();
     void oledClear();
     void oledClearRect(int x, int y, int w, int h);
     void oledSetPixel(int x, int y, bool on);

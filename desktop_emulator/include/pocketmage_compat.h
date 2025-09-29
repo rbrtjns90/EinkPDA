@@ -1,12 +1,7 @@
 #ifndef POCKETMAGE_COMPAT_H
 #define POCKETMAGE_COMPAT_H
 
-// Comprehensive PocketMage compatibility header for desktop compilation
-
-// Debug output control - set to false to disable verbose terminal output
 #define EMULATOR_DEBUG_OUTPUT false
-
-// Debug macro for conditional output
 #if EMULATOR_DEBUG_OUTPUT
 #define DEBUG_PRINT(x) std::cout << x << std::endl
 #define DEBUG_LOG(tag, msg) std::cout << "[" << tag << "] " << msg << std::endl
@@ -31,7 +26,6 @@
 #include <cctype>
 #include <iomanip>
 
-// Arduino String class implementation
 class String {
 private:
     std::string data;
@@ -39,7 +33,7 @@ public:
     String() {}
     String(const char* str) : data(str ? str : "") {}
     String(const std::string& str) : data(str) {}
-    String(char c) : data(1, c) {}  // Handle single character properly
+    String(char c) : data(1, c) {}
     String(int value) : data(std::to_string(value)) {}
     String(float value) : data(std::to_string(value)) {}
     String(double value) : data(std::to_string(value)) {}

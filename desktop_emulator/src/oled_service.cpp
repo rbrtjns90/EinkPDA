@@ -7,7 +7,6 @@
 
 extern DesktopDisplay* g_display;
 
-// Static member definition for U8g2 compatibility
 std::string U8G2_SH1106_128X32_VISIONOX_F_HW_I2C::textLines[3];
 
 OledService& OledService::getInstance() {
@@ -24,7 +23,6 @@ void OledService::setLines(const std::string& line1, const std::string& line2, c
 }
 
 void OledService::presentIfDirty() {
-    // Re-entrancy guard
     if (inPresent_.exchange(true)) {
         return;
     }
@@ -36,15 +34,12 @@ void OledService::presentIfDirty() {
             inPresent_.store(false);
             return;
         }
-        // Copy data for rendering
         line1 = state_.line1;
         line2 = state_.line2;
         line3 = state_.line3;
-        // Mark as presented but keep data for getSnapshot()
         state_.dirty = false;
     }
     
-    // Render on main thread only (g_display is owned by main)
     if (g_display) g_display->renderOledText(line1, line2, line3);
     
     inPresent_.store(false);

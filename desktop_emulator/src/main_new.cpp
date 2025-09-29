@@ -6,20 +6,15 @@
 #include <cstdlib>
 #include <string>
 
-// Forward declaration
 bool loadKeyboardLayout(const String& layoutName);
 
-// Include globals to access AppState enum
 enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
 
-// Desktop emulator globals - declared in desktop_display_sdl2.cpp
 extern DesktopDisplay* g_display;
 
-// Forward declarations for real PocketMage functions
 void setup();
 void loop();
 
-// Forward declarations for real PocketMage display handlers
 void einkHandler_HOME();
 void einkHandler_TXT();
 void einkHandler_FILEWIZ();
@@ -30,7 +25,6 @@ void einkHandler_CALENDAR();
 void einkHandler_JOURNAL();
 void einkHandler_LEXICON();
 
-// Forward declare PocketMage initialization functions
 extern void TXT_INIT();
 extern void FILEWIZ_INIT();
 extern void TASKS_INIT();
@@ -39,10 +33,7 @@ extern void CALENDAR_INIT();
 extern void JOURNAL_INIT();
 extern void LEXICON_INIT();
 
-// Forward declare the application handler
 extern void applicationEinkHandler();
-
-// Emulator-specific setup
 void emulatorSetup() {
     std::cout << "===================================" << std::endl;
     std::cout << "PocketMage Desktop Emulator v1.0" << std::endl;

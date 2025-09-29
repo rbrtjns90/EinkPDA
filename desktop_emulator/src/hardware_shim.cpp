@@ -13,19 +13,13 @@
 #include "Adafruit_TCA8418.h"
 #include "Adafruit_GFX.h"
 
-// Access to global display instance
 extern DesktopDisplay* g_display;
-
-// TXT app variables are defined in globals.cpp
-
-// AppState enum is now defined in globals.h
 #include "GxEPD2_BW.h"
 #include "U8g2lib.h"
 #include "Buzzer.h"
 #include "USB.h"
 
 SerialClass Serial;
-// rtc, u8g2, keypad are defined in real PocketMage globals.cpp
 SD_MMCClass SD_MMC;
 TwoWire Wire;
 SPIClass SPI;
@@ -138,11 +132,6 @@ void oledWord(const char* text, bool /*clear*/, bool /*send*/) {
     oled_set_lines(text ? text : "", "", "");
 }
 
-
-// PocketMage configuration constants - duplicates removed, defined in real PocketMage globals.cpp
-// Configuration variables are now defined as macros in config.h
-
-// useFastFullUpdate is defined in real PocketMage globals.cpp
 
 long random(long max) {
     return rand() % max;

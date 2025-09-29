@@ -8,19 +8,18 @@
 #include <cstdlib>
 #include <chrono>
 
-// --- E-Ink simulation config/state -----------------------------------------
 namespace {
     struct EInkSimConfig {
-        bool  enabled          = false; // runtime toggle; F5
-        bool  flash_full       = true;  // white/black flashes on full refresh
-        bool  flash_partial    = false; // real panels usually don't flash on partial
-        int   full_ms          = 0;     // No delays to avoid Metal issues
-        int   partial_ms       = 0;     // No delays to avoid Metal issues
-        float ghosting_full    = 0.02f; // faint retention after full
-        float ghosting_partial = 0.08f; // stronger retention on partial
-        float full_threshold   = 0.22f; // >22% pixels changed ⇒ full refresh
-        int   wipe_step_px     = 18;    // stripe width for partial wipe
-        int   diff_threshold   = 24;    // 0..255; change threshold to count as "dirty"
+        bool  enabled          = false;
+        bool  flash_full       = true;
+        bool  flash_partial    = false;
+        int   full_ms          = 0;
+        int   partial_ms       = 0;
+        float ghosting_full    = 0.02f;
+        float ghosting_partial = 0.08f;
+        float full_threshold   = 0.22f;
+        int   wipe_step_px     = 18;
+        int   diff_threshold   = 24;
     };
     static EInkSimConfig g_einkSimCfg;
     static bool g_einkSimEnabled = false;
@@ -50,7 +49,6 @@ DesktopDisplay::~DesktopDisplay() {
 bool DesktopDisplay::init() {
     DEBUG_LOG("SDL2", "Initializing DesktopDisplay...");
     
-    // Use basic software rendering without extreme restrictions
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
     SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1");
@@ -61,17 +59,13 @@ bool DesktopDisplay::init() {
         return false;
     }
     
-    // Enable text input for UTF-8 support
     SDL_StartTextInput();
 
-    // Initialize SDL_ttf
     if (TTF_Init() == -1) {
         std::cerr << "[SDL2] TTF_Init failed: " << TTF_GetError() << std::endl;
         SDL_Quit();
         return false;
     }
-
-    // Create E-Ink window
     einkWindow = SDL_CreateWindow("PocketMage E-Ink Display",
                                   SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                   EINK_WIDTH * EINK_WINDOW_SCALE, EINK_HEIGHT * EINK_WINDOW_SCALE,
@@ -82,7 +76,6 @@ bool DesktopDisplay::init() {
         return false;
     }
 
-    // Create software renderer only - no hardware acceleration
     einkRenderer = SDL_CreateRenderer(einkWindow, -1, SDL_RENDERER_SOFTWARE);
     if (!einkRenderer) {
         std::cerr << "[SDL2] Failed to create E-Ink software renderer: " << SDL_GetError() << std::endl;
@@ -90,17 +83,13 @@ bool DesktopDisplay::init() {
         return false;
     }
     
-    // Check what renderer we got
     SDL_RendererInfo info;
     if (SDL_GetRendererInfo(einkRenderer, &info) == 0) {
         std::cout << "[SDL2] E-Ink renderer: " << info.name << " (flags: " << info.flags << ")" << std::endl;
     }
     
-    // Use logical size + integer scaling (resizes cleanly, no per-frame viewport churn)
     SDL_RenderSetLogicalSize(einkRenderer, EINK_WIDTH, EINK_HEIGHT);
     SDL_RenderSetIntegerScale(einkRenderer, SDL_TRUE);
-
-    // Create OLED window
     oledWindow = SDL_CreateWindow("PocketMage OLED Display",
                                   SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED + (EINK_HEIGHT * EINK_WINDOW_SCALE) + 50,
                                   OLED_WIDTH * OLED_WINDOW_SCALE, OLED_HEIGHT * OLED_WINDOW_SCALE,
@@ -111,7 +100,6 @@ bool DesktopDisplay::init() {
         return false;
     }
 
-    // Create software renderer only - no hardware acceleration
     oledRenderer = SDL_CreateRenderer(oledWindow, -1, SDL_RENDERER_SOFTWARE);
     if (!oledRenderer) {
         std::cerr << "[SDL2] Failed to create OLED software renderer: " << SDL_GetError() << std::endl;
@@ -119,17 +107,13 @@ bool DesktopDisplay::init() {
         return false;
     }
     
-    // Check what renderer we got
     SDL_RendererInfo oledInfo;
     if (SDL_GetRendererInfo(oledRenderer, &oledInfo) == 0) {
         std::cout << "[SDL2] OLED renderer: " << oledInfo.name << " (flags: " << oledInfo.flags << ")" << std::endl;
     }
     
-    // Use logical size (safer than per-frame viewports) for 128x32 OLED
     SDL_RenderSetLogicalSize(oledRenderer, OLED_WIDTH, OLED_HEIGHT);
     SDL_RenderSetIntegerScale(oledRenderer, SDL_TRUE);
-
-    // Create textures with ARGB8888 format for software rendering
     einkTexture = SDL_CreateTexture(einkRenderer, SDL_PIXELFORMAT_ARGB8888, 
                                     SDL_TEXTUREACCESS_STREAMING, EINK_WIDTH, EINK_HEIGHT);
     if (!einkTexture) {
