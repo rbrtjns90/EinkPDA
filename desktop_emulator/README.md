@@ -54,14 +54,6 @@ export POCKETMAGE_EINK_SIM=1
 - **F7**: Cycle partial ghosting level (0 → 0.04 → 0.08 → 0.12 → 0)
 - **F8**: Toggle wipe stripe width (18px ↔ 10px)
 
-
-#### **Pokédex Features:**
-- **Complete Pokémon Database**: All Generation 1 Pokémon with detailed information
-- **Advanced Search**: Search Pokémon by name with real-time filtering
-- **Detailed Pokémon Profiles**: Including stats, types, descriptions, and physical data
-- **Visual Stat Bars**: Graphical representation of Pokémon statistics
-- **Navigation**: Browse through Pokémon with arrow keys
-
 ![Pokédex Application](pokedex.png)
 *The Pokédex showing the complete list of Generation 1 Pokémon with sprites and navigation*
 
@@ -227,7 +219,6 @@ desktop_emulator/
 ### Pokémon Data
 The Pokédex uses data scraped from the official PokéAPI, including:
 - Official Pokémon statistics and information
-- High-quality sprite images
 - Accurate Pokédex descriptions
 - Complete type and species data
 
