@@ -214,8 +214,8 @@ void DesktopDisplay::cleanup() {
 // E-Ink display methods
 void DesktopDisplay::einkClear() {
     std::fill(einkBuffer.begin(), einkBuffer.end(), 255);
-    // Force immediate refresh to clear artifacts when transitioning between apps
-    updateEinkTexture();
+    // Force complete refresh to ensure screen is cleared, bypassing row-dirty detection
+    einkForceFullRefresh();
 }
 
 void DesktopDisplay::einkSetPixel(int x, int y, bool black) {
@@ -405,6 +405,10 @@ void DesktopDisplay::einkPartialRefresh() { updateEinkTexture(); }
 void DesktopDisplay::einkForceFullRefresh() {
     if (!einkTexture || !einkRenderer) return;
     
+    // Reset row-dirty detection buffer to force complete update next time
+    const size_t N = size_t(EINK_WIDTH) * size_t(EINK_HEIGHT);
+    einkPrevBuffer.assign(N, 128); // Set to gray so any content change is detected
+    
     void* pixels; int pitch;
     if (SDL_LockTexture(einkTexture, nullptr, &pixels, &pitch) != 0) {
         std::cerr << "[SDL2] Failed to lock E-Ink texture: " << SDL_GetError() << std::endl;
@@ -431,6 +435,9 @@ void DesktopDisplay::einkForceFullRefresh() {
     SDL_RenderClear(einkRenderer);
     SDL_RenderCopy(einkRenderer, einkTexture, nullptr, nullptr);
     SDL_RenderPresent(einkRenderer);
+    
+    // Update previous buffer to current state
+    einkPrevBuffer = einkBuffer;
 }
 
 // OLED display methods
@@ -696,16 +703,15 @@ void DesktopDisplay::updateEinkTexture() {
     if (!einkTexture || !einkRenderer) return;
 
     // Row‑dirty upload (fast path, works for both sim on/off)
-    static std::vector<uint8_t> prevBuf; 
     const size_t N = size_t(EINK_WIDTH) * size_t(EINK_HEIGHT);
-    if (prevBuf.size() != N) prevBuf.assign(N, 0); // Initialize to black so first clear is detected
+    if (einkPrevBuffer.size() != N) einkPrevBuffer.assign(N, 0); // Initialize to black so first clear is detected
 
     // Find changed rows
     std::vector<int> dirtyRows;
     dirtyRows.reserve(EINK_HEIGHT);
     for (int y = 0; y < EINK_HEIGHT; ++y) {
         const uint8_t* r  = &einkBuffer[y * EINK_WIDTH];
-        const uint8_t* pr = &prevBuf[y * EINK_WIDTH];
+        const uint8_t* pr = &einkPrevBuffer[y * EINK_WIDTH];
         if (std::memcmp(r, pr, EINK_WIDTH) != 0) dirtyRows.push_back(y);
     }
     if (dirtyRows.empty()) return;
@@ -725,7 +731,7 @@ void DesktopDisplay::updateEinkTexture() {
             uint8_t g = src[x];
             out[x] = 0xFF000000u | (g << 16) | (g << 8) | g;
         }
-        std::memcpy(&prevBuf[y * EINK_WIDTH], src, EINK_WIDTH);
+        std::memcpy(&einkPrevBuffer[y * EINK_WIDTH], src, EINK_WIDTH);
     }
     SDL_UnlockTexture(einkTexture);
     

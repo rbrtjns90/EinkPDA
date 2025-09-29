@@ -73,6 +73,7 @@ private:
 
     // E‑Ink buffer (8-bit grayscale today; row‑dirty uploads)
     std::vector<uint8_t> einkBuffer;
+    std::vector<uint8_t> einkPrevBuffer; // For row-dirty detection
 
     // OLED buffer (1 byte per pixel, 0/255)
     std::vector<uint8_t> oledBuffer;
