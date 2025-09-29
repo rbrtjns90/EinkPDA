@@ -459,10 +459,6 @@ void mirrorLayoutToLegacy() {
     std::cout << "[UTF8] mirrorLayoutToLegacy() called" << std::endl;
 }
 
-void stringToVector(String inputText) {
-    // Implementation for the void version declared in globals.h
-    std::cout << "[UTF8] stringToVector() called with: " << inputText.c_str() << std::endl;
-}
 
 void cycleKeyboardLayout() {
     // Available keyboard layouts in order
@@ -693,17 +689,6 @@ void drawStatusBar(String status) {
     std::cout << "[StatusBar] " << status.c_str() << std::endl;
 }
 
-// Missing functions for linker
-int countLines(String text, unsigned long maxWidth) {
-    // Simple line counting implementation
-    int lines = 1;
-    for (size_t i = 0; i < text.length(); i++) {
-        if (text.charAt(i) == '\n') {
-            lines++;
-        }
-    }
-    return lines;
-}
 
 // Forward declaration
 void applicationEinkHandler();

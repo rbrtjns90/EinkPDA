@@ -70,13 +70,28 @@ set(POCKETMAGE_SOURCES_MANUAL
 # ---------------------------
 # Project sources / includes
 # ---------------------------
-# Emulator-specific sources
+# Base emulator sources (cross-platform)
 set(EMULATOR_SOURCES
   src/main_new.cpp
-  src/desktop_display_sdl2.cpp
   src/hardware_shim.cpp
   src/oled_service.cpp
+  src/text_utils_desktop.cpp
 )
+
+# Platform-specific display backend
+if(WIN32)
+  message(STATUS "Building for Windows - using Windows-specific display backend")
+  list(APPEND EMULATOR_SOURCES src/desktop_display_sdl2_windows.cpp)
+elseif(UNIX AND NOT APPLE)
+  message(STATUS "Building for Linux - using Linux-specific display backend")
+  list(APPEND EMULATOR_SOURCES src/desktop_display_sdl2_linux.cpp)
+elseif(APPLE)
+  message(STATUS "Building for macOS - using Mac display backend")
+  list(APPEND EMULATOR_SOURCES src/desktop_display_sdl2.cpp)
+else()
+  message(STATUS "Building for unknown platform - using cross-platform display backend")
+  list(APPEND EMULATOR_SOURCES src/desktop_display_sdl2.cpp)
+endif()
 
 add_executable(${PROJECT_NAME}
   ${EMULATOR_SOURCES}
@@ -88,14 +103,38 @@ target_include_directories(${PROJECT_NAME} PRIVATE
   ${POCKETMAGE_INCLUDE}
 )
 
-# Definitions & compile options
+# ---------------------------
+# Platform-specific definitions & compile options
+# ---------------------------
 target_compile_definitions(${PROJECT_NAME} PRIVATE DESKTOP_EMULATOR)
-if (MSVC)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
-endif()
+
+# Windows-specific settings
 if (WIN32)
-  # Prevent SDL from redefining main() to SDL_main on Windows
+  message(STATUS "Applying Windows-specific build settings")
   target_compile_definitions(${PROJECT_NAME} PRIVATE SDL_MAIN_HANDLED)
+  if (MSVC)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
+    # Enable Windows-specific optimizations
+    target_compile_options(${PROJECT_NAME} PRIVATE /W3)
+  endif()
+endif()
+
+# Linux-specific settings
+if (UNIX AND NOT APPLE)
+  message(STATUS "Applying Linux-specific build settings")
+  target_compile_definitions(${PROJECT_NAME} PRIVATE __LINUX__)
+  # Enable Linux-specific optimizations
+  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -O2)
+endif()
+
+# macOS-specific settings
+if (APPLE)
+  message(STATUS "Applying macOS-specific build settings")
+  target_compile_definitions(${PROJECT_NAME} PRIVATE __APPLE__)
+  # Enable macOS-specific optimizations
+  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -O2)
+  # macOS-specific frameworks if needed
+  # target_link_libraries(${PROJECT_NAME} PRIVATE "-framework Cocoa")
 endif()
 
 # ---------------------------
@@ -109,23 +148,45 @@ endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE ${_sdl_targets})
 
 # ---------------------------
-# Post-build: copy assets & DLLs
+# Post-build: copy assets & platform-specific files
 # ---------------------------
 # Copy data directory (if it exists)
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory
-          ${CMAKE_SOURCE_DIR}/data $<TARGET_FILE_DIR:${PROJECT_NAME}>/data
-  VERBATIM
-)
+if(EXISTS ${CMAKE_SOURCE_DIR}/data)
+  add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/data $<TARGET_FILE_DIR:${PROJECT_NAME}>/data
+    COMMENT "Copying data directory"
+    VERBATIM
+  )
+endif()
 
-# On Windows shared builds, copy SDL2/SDL2_ttf DLLs next to the .exe
+# Copy fonts directory (cross-platform)
+if(EXISTS ${CMAKE_SOURCE_DIR}/fonts)
+  add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/fonts $<TARGET_FILE_DIR:${PROJECT_NAME}>/fonts
+    COMMENT "Copying fonts directory"
+    VERBATIM
+  )
+endif()
+
+# Platform-specific post-build steps
 if (WIN32)
+  message(STATUS "Setting up Windows post-build steps")
+  # Copy SDL2/SDL2_ttf DLLs next to the .exe on Windows
   foreach(tgt IN ITEMS SDL2::SDL2 SDL2_ttf::SDL2_ttf)
     if (TARGET ${tgt})
       add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 $<TARGET_FILE:${tgt}> $<TARGET_FILE_DIR:${PROJECT_NAME}>
+        COMMENT "Copying ${tgt} DLL"
       )
     endif()
   endforeach()
+elseif(UNIX AND NOT APPLE)
+  message(STATUS "Setting up Linux post-build steps")
+  # Linux-specific post-build steps (if any)
+elseif(APPLE)
+  message(STATUS "Setting up macOS post-build steps")
+  # macOS-specific post-build steps (if any)
 endif()
