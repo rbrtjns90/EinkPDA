@@ -59,7 +59,7 @@ git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
 C:\vcpkg\bootstrap-vcpkg.bat
 vcpkg install sdl2 sdl2-ttf:x64-windows
 ```
-You'll need the Windows 10/11 SDK as well through Visual Studio
+You'll need the Windows 10/11 (depending on your Win version) SDK as well through Visual Studio
 
 ### Build & Run
 
