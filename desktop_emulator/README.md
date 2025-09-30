@@ -65,9 +65,8 @@ You'll need the Windows 10/11 SDK as well through Visual Studio
 
 ```bash
 cd desktop_emulator
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release
-./build/Release/PocketMage_Desktop_Emulator
+.\build.bat
+.\run_pocketmage.bat
 ```
 
 ### E-ink Simulation Mode
