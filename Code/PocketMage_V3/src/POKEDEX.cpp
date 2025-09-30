@@ -57,6 +57,11 @@ bool pokemonDataLoaded = false;
 
 void POKEDEX_INIT() {
   std::cout << "[POCKETMAGE] POKEDEX_INIT() starting..." << std::endl;
+  
+  // Clear screen to remove artifacts from previous app
+  display.fillScreen(GxEPD_WHITE);
+  refresh();
+  
   CurrentAppState = POKEDEX;
   CurrentPokedexState = POKE_LIST;
   CurrentKBState = NORMAL;
@@ -154,6 +159,12 @@ void loadSamplePokemonData() {
 }
 
 bool loadPokemonSprite(uint16_t pokemonId, uint8_t* spriteBuffer, size_t bufferSize) {
+  // Safety check
+  if (!spriteBuffer || bufferSize == 0) {
+    std::cerr << "[POKEDEX] ERROR: Invalid sprite buffer!" << std::endl;
+    return false;
+  }
+  
   // Load sprite from pokemon_sprites.bin file
   FILE* spriteFile = fopen("./data/pokemon/pokemon_sprites.bin", "rb");
   if (!spriteFile) {
@@ -219,6 +230,12 @@ bool loadPokemonSprite(uint16_t pokemonId, uint8_t* spriteBuffer, size_t bufferS
 void drawSprite(int x, int y, const uint8_t* spriteData, int width, int height) {
   // Draw 1-bit bitmap sprite to E-Ink display
   // Sprite format: 1 bit per pixel, packed into bytes (8 pixels per byte)
+  
+  // Safety check: prevent crash if spriteData is null
+  if (!spriteData || width <= 0 || height <= 0) {
+    std::cerr << "[POKEDEX] ERROR: Invalid sprite parameters in drawSprite!" << std::endl;
+    return;
+  }
   
   for (int row = 0; row < height; row++) {
     for (int col = 0; col < width; col += 8) {

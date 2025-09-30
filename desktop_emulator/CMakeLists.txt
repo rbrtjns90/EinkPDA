@@ -4,6 +4,22 @@ project(PocketMage_Desktop_Emulator)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Enable debug symbols by default
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
+endif()
+
+# Add debug flags
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+  message(STATUS "Building in Debug mode with debug symbols")
+  if(MSVC)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zi /Od /DEBUG:FULL")
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /DEBUG:FULL")
+  else()
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
+  endif()
+endif()
+
 # ---------------------------
 # SDL2 / SDL2_ttf discovery
 # ---------------------------
@@ -112,8 +128,19 @@ if (WIN32)
   target_compile_definitions(${PROJECT_NAME} PRIVATE SDL_MAIN_HANDLED)
   if (MSVC)
     target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
-    # Enable Windows-specific optimizations
+    # Enable Windows-specific compile options
     target_compile_options(${PROJECT_NAME} PRIVATE /W3)
+    # Generate PDB files for debugging
+    if(CMAKE_BUILD_TYPE MATCHES Debug)
+      target_compile_options(${PROJECT_NAME} PRIVATE /Zi)
+      target_link_options(${PROJECT_NAME} PRIVATE /DEBUG:FULL /INCREMENTAL:NO)
+    endif()
+  else()
+    # MinGW or other compilers on Windows
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
+    if(CMAKE_BUILD_TYPE MATCHES Debug)
+      target_compile_options(${PROJECT_NAME} PRIVATE -g -O0)
+    endif()
   endif()
 endif()
 

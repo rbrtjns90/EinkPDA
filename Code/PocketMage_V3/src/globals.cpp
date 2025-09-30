@@ -67,7 +67,7 @@ bool SAVE_POWER;          // Enable a slower CPU clock speed to save battery wit
 bool ALLOW_NO_MICROSD;    // Allow the device to operate with no SD card
 bool HOME_ON_BOOT;        // Always start the home app on boot
 int OLED_BRIGHTNESS;      // Brightness of the OLED (0-255)
-int OLED_MAX_FPS;         // Define the max oled FPS
+int OLED_MAX_FPS = 30;    // Define the max oled FPS (default 30 to prevent divide by zero)
 
 volatile int einkRefresh = FULL_REFRESH_AFTER;
 int OLEDFPSMillis = 0;

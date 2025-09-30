@@ -1,8 +1,17 @@
 @echo off
 REM PocketMage Desktop Emulator Build Script for Windows
 REM This script builds the desktop emulator using Windows-specific SDL2 backend
+REM Usage: build.bat [Debug|Release]
+REM Default: Debug
 
 setlocal enabledelayedexpansion
+
+REM Parse build type argument
+set BUILD_TYPE=Debug
+if not "%1"=="" (
+    set BUILD_TYPE=%1
+)
+echo Build type: %BUILD_TYPE%
 
 REM Colors for output (using Windows console colors)
 set "INFO_COLOR=[94m"
@@ -20,17 +29,36 @@ set BUILD_DIR=build-windows
 REM Check for required tools
 echo %INFO_COLOR%[INFO]%NC% Checking dependencies...
 
-REM Check for CMake
+REM Check for CMake and find it in common locations
+set "CMAKE_EXE=cmake"
 cmake --version >nul 2>&1
 if errorlevel 1 (
-    echo %ERROR_COLOR%[ERROR]%NC% CMake not found! Please install CMake 3.16 or later
-    echo %INFO_COLOR%[INFO]%NC% Download from: https://cmake.org/download/
-    pause
-    exit /b 1
+    echo %WARNING_COLOR%[WARNING]%NC% CMake not in PATH, searching common locations...
+    
+    REM Check common CMake installation paths
+    if exist "C:\Program Files\CMake\bin\cmake.exe" (
+        set "CMAKE_EXE=C:\Program Files\CMake\bin\cmake.exe"
+        echo %SUCCESS_COLOR%[SUCCESS]%NC% Found CMake in Program Files
+    ) else if exist "C:\Program Files (x86)\CMake\bin\cmake.exe" (
+        set "CMAKE_EXE=C:\Program Files (x86)\CMake\bin\cmake.exe"
+        echo %SUCCESS_COLOR%[SUCCESS]%NC% Found CMake in Program Files (x86)
+    ) else if exist "%ProgramFiles%\CMake\bin\cmake.exe" (
+        set "CMAKE_EXE=%ProgramFiles%\CMake\bin\cmake.exe"
+        echo %SUCCESS_COLOR%[SUCCESS]%NC% Found CMake in ProgramFiles directory
+    ) else (
+        echo %ERROR_COLOR%[ERROR]%NC% CMake not found! Please install CMake 3.16 or later
+        echo %INFO_COLOR%[INFO]%NC% Download from: https://cmake.org/download/
+        echo %INFO_COLOR%[INFO]%NC% Or add CMake to your PATH
+        pause
+        exit /b 1
+    )
+) else (
+    echo %SUCCESS_COLOR%[SUCCESS]%NC% Found CMake in PATH
 )
 
-for /f "tokens=3" %%i in ('cmake --version ^| findstr /R "cmake version"') do set CMAKE_VERSION=%%i
-echo %SUCCESS_COLOR%[SUCCESS]%NC% Found CMake !CMAKE_VERSION!
+REM Get CMake version
+for /f "tokens=3" %%i in ('"%CMAKE_EXE%" --version ^| findstr /R "cmake version"') do set CMAKE_VERSION=%%i
+echo %INFO_COLOR%[INFO]%NC% CMake version: !CMAKE_VERSION!
 
 REM Check for Visual Studio or Build Tools
 set VS_FOUND=0
@@ -76,13 +104,20 @@ if exist "C:\vcpkg\vcpkg.exe" (
     echo %INFO_COLOR%[INFO]%NC%   .\vcpkg install sdl2 sdl2-ttf
 )
 
+REM Download/fix fonts before building
+echo %INFO_COLOR%[INFO]%NC% Checking and downloading fonts...
+powershell -ExecutionPolicy Bypass -File "%~dp0utils\download-fonts.ps1"
+if errorlevel 1 (
+    echo %WARNING_COLOR%[WARNING]%NC% Font download had issues, but continuing build...
+)
+
 REM Create and enter build directory
 echo %INFO_COLOR%[INFO]%NC% Creating build directory: %BUILD_DIR%
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 cd "%BUILD_DIR%"
 
 REM Configure with CMake
-echo %INFO_COLOR%[INFO]%NC% Configuring build with CMake...
+echo %INFO_COLOR%[INFO]%NC% Configuring build with CMake (Build Type: %BUILD_TYPE%)...
 
 REM Try different configuration approaches
 set CMAKE_SUCCESS=0
@@ -90,7 +125,7 @@ set CMAKE_SUCCESS=0
 REM First try with vcpkg toolchain if available
 if defined VCPKG_ROOT (
     echo %INFO_COLOR%[INFO]%NC% Trying configuration with vcpkg toolchain...
-    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" >nul 2>&1
+    "%CMAKE_EXE%" .. -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" >nul 2>&1
     if not errorlevel 1 (
         set CMAKE_SUCCESS=1
         echo %SUCCESS_COLOR%[SUCCESS]%NC% Configuration successful with vcpkg
@@ -100,7 +135,7 @@ if defined VCPKG_ROOT (
 REM If vcpkg failed or not available, try standard configuration
 if !CMAKE_SUCCESS! == 0 (
     echo %INFO_COLOR%[INFO]%NC% Trying standard configuration...
-    cmake .. -DCMAKE_BUILD_TYPE=Release
+    "%CMAKE_EXE%" .. -DCMAKE_BUILD_TYPE=%BUILD_TYPE%
     if not errorlevel 1 (
         set CMAKE_SUCCESS=1
         echo %SUCCESS_COLOR%[SUCCESS]%NC% Configuration successful
@@ -114,44 +149,100 @@ if !CMAKE_SUCCESS! == 0 (
 )
 
 REM Build the project
-echo %INFO_COLOR%[INFO]%NC% Building project...
-cmake --build . --config Release
+echo %INFO_COLOR%[INFO]%NC% Building project (Config: %BUILD_TYPE%)...
+echo.
+"%CMAKE_EXE%" --build . --config %BUILD_TYPE% 2>&1
+set BUILD_RESULT=%ERRORLEVEL%
+echo.
+
+REM Go back to parent directory to display results
+cd ..
 
 REM Check if build was successful
-if exist "Release\PocketMage_Desktop_Emulator.exe" (
-    echo %SUCCESS_COLOR%[SUCCESS]%NC% Build completed successfully!
-    echo %INFO_COLOR%[INFO]%NC% Executable: %CD%\Release\PocketMage_Desktop_Emulator.exe
-    
-    REM Check if data directory was copied
-    if exist "data" (
-        echo %SUCCESS_COLOR%[SUCCESS]%NC% Assets copied to build directory
-    ) else (
-        echo %WARNING_COLOR%[WARNING]%NC% Assets directory not found - some features may not work
-    )
-    
-    echo %INFO_COLOR%[INFO]%NC% To run the emulator:
-    echo %INFO_COLOR%[INFO]%NC%   cd %BUILD_DIR%
-    echo %INFO_COLOR%[INFO]%NC%   Release\PocketMage_Desktop_Emulator.exe
-) else if exist "Debug\PocketMage_Desktop_Emulator.exe" (
-    echo %SUCCESS_COLOR%[SUCCESS]%NC% Build completed successfully! (Debug build)
-    echo %INFO_COLOR%[INFO]%NC% Executable: %CD%\Debug\PocketMage_Desktop_Emulator.exe
-    
-    echo %INFO_COLOR%[INFO]%NC% To run the emulator:
-    echo %INFO_COLOR%[INFO]%NC%   cd %BUILD_DIR%
-    echo %INFO_COLOR%[INFO]%NC%   Debug\PocketMage_Desktop_Emulator.exe
-) else if exist "PocketMage_Desktop_Emulator.exe" (
-    echo %SUCCESS_COLOR%[SUCCESS]%NC% Build completed successfully!
-    echo %INFO_COLOR%[INFO]%NC% Executable: %CD%\PocketMage_Desktop_Emulator.exe
-    
-    echo %INFO_COLOR%[INFO]%NC% To run the emulator:
-    echo %INFO_COLOR%[INFO]%NC%   cd %BUILD_DIR%
-    echo %INFO_COLOR%[INFO]%NC%   PocketMage_Desktop_Emulator.exe
-) else (
-    echo %ERROR_COLOR%[ERROR]%NC% Build failed - executable not found
+if %BUILD_RESULT% NEQ 0 (
+    echo %ERROR_COLOR%[ERROR]%NC% Build failed with error code %BUILD_RESULT%
     echo %INFO_COLOR%[INFO]%NC% Check the build output above for errors
     pause
     exit /b 1
 )
+
+if exist "%BUILD_DIR%\Release\PocketMage_Desktop_Emulator.exe" (
+    echo %SUCCESS_COLOR%[SUCCESS]%NC% Build completed successfully!
+    echo %INFO_COLOR%[INFO]%NC% Executable: %CD%\%BUILD_DIR%\Release\PocketMage_Desktop_Emulator.exe
+    echo.
+    
+    REM Check if data directory was copied
+    if exist "%BUILD_DIR%\Release\data" (
+        echo %SUCCESS_COLOR%[SUCCESS]%NC% Assets copied to build directory
+    ) else (
+        echo %WARNING_COLOR%[WARNING]%NC% Assets directory not found - some features may not work
+    )
+    echo.
+    
+    REM Create convenience run script
+    echo @echo off > run_pocketmage.bat
+    echo cd /d "%%~dp0%BUILD_DIR%\Release" >> run_pocketmage.bat
+    echo start PocketMage_Desktop_Emulator.exe >> run_pocketmage.bat
+    echo %SUCCESS_COLOR%[SUCCESS]%NC% Created run_pocketmage.bat in current directory
+    echo.
+    
+    echo %INFO_COLOR%[INFO]%NC% To run the emulator:
+    echo %INFO_COLOR%[INFO]%NC%   .\run_pocketmage.bat
+    echo %INFO_COLOR%[INFO]%NC% Or manually:
+    echo %INFO_COLOR%[INFO]%NC%   cd %BUILD_DIR%\Release
+    echo %INFO_COLOR%[INFO]%NC%   .\PocketMage_Desktop_Emulator.exe
+    echo.
+    goto :build_success
+)
+
+if exist "%BUILD_DIR%\Debug\PocketMage_Desktop_Emulator.exe" (
+    echo %SUCCESS_COLOR%[SUCCESS]%NC% Build completed successfully! (Debug build)
+    echo %INFO_COLOR%[INFO]%NC% Executable: %CD%\%BUILD_DIR%\Debug\PocketMage_Desktop_Emulator.exe
+    echo.
+    
+    REM Create convenience run script
+    echo @echo off > run_pocketmage.bat
+    echo cd /d "%%~dp0%BUILD_DIR%\Debug" >> run_pocketmage.bat
+    echo start PocketMage_Desktop_Emulator.exe >> run_pocketmage.bat
+    echo %SUCCESS_COLOR%[SUCCESS]%NC% Created run_pocketmage.bat in current directory
+    echo.
+    
+    echo %INFO_COLOR%[INFO]%NC% To run the emulator:
+    echo %INFO_COLOR%[INFO]%NC%   .\run_pocketmage.bat
+    echo %INFO_COLOR%[INFO]%NC% Or manually:
+    echo %INFO_COLOR%[INFO]%NC%   cd %BUILD_DIR%\Debug
+    echo %INFO_COLOR%[INFO]%NC%   .\PocketMage_Desktop_Emulator.exe
+    echo.
+    goto :build_success
+)
+
+if exist "%BUILD_DIR%\PocketMage_Desktop_Emulator.exe" (
+    echo %SUCCESS_COLOR%[SUCCESS]%NC% Build completed successfully!
+    echo %INFO_COLOR%[INFO]%NC% Executable: %CD%\%BUILD_DIR%\PocketMage_Desktop_Emulator.exe
+    echo.
+    
+    REM Create convenience run script
+    echo @echo off > run_pocketmage.bat
+    echo cd /d "%%~dp0%BUILD_DIR%" >> run_pocketmage.bat
+    echo start PocketMage_Desktop_Emulator.exe >> run_pocketmage.bat
+    echo %SUCCESS_COLOR%[SUCCESS]%NC% Created run_pocketmage.bat in current directory
+    echo.
+    
+    echo %INFO_COLOR%[INFO]%NC% To run the emulator:
+    echo %INFO_COLOR%[INFO]%NC%   .\run_pocketmage.bat
+    echo %INFO_COLOR%[INFO]%NC% Or manually:
+    echo %INFO_COLOR%[INFO]%NC%   cd %BUILD_DIR%
+    echo %INFO_COLOR%[INFO]%NC%   .\PocketMage_Desktop_Emulator.exe
+    echo.
+    goto :build_success
+)
+
+echo %ERROR_COLOR%[ERROR]%NC% Build succeeded but executable not found
+echo %INFO_COLOR%[INFO]%NC% This may indicate a configuration issue
+pause
+exit /b 1
+
+:build_success
 
 echo %INFO_COLOR%[INFO]%NC% Build script completed
 pause

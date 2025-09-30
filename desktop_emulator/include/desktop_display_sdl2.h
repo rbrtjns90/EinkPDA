@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <mutex>
 
 constexpr int EINK_WIDTH  = 320;
 constexpr int EINK_HEIGHT = 240;
@@ -14,6 +15,7 @@ constexpr int OLED_HEIGHT = 32;
 
 constexpr int EINK_WINDOW_SCALE = 3;
 constexpr int OLED_WINDOW_SCALE = 2;
+constexpr int SCALE_FACTOR = 3;
 
 class DesktopDisplay {
 public:
@@ -77,6 +79,9 @@ private:
 
     // OLED buffer (1 byte per pixel, 0/255)
     std::vector<uint8_t> oledBuffer;
+
+    // Thread safety
+    std::mutex einkMutex;
 
     void updateEinkTexture();
     void updateOledTexture();

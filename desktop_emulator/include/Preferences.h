@@ -14,7 +14,7 @@ public:
     String getString(const char* key, const String& defaultValue = "") { return defaultValue; }
     
     size_t putInt(const char* key, int32_t value) { return sizeof(int32_t); }
-    int32_t getInt(const char* key, int32_t defaultValue = 0) { return defaultValue; }
+    int32_t getInt(const char* key, int32_t defaultValue) { return defaultValue; }
     
     size_t putBool(const char* key, bool value) { return sizeof(bool); }
     bool getBool(const char* key, bool defaultValue = false) { return defaultValue; }

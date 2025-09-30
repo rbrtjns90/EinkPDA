@@ -843,17 +843,19 @@ void loadState(bool changeState) {
   DEBUG_VERBOSE     = prefs.getBool("DEBUG_VERBOSE", true);
   SYSTEM_CLOCK      = prefs.getBool("SYSTEM_CLOCK", true);
   SHOW_YEAR         = prefs.getBool("SHOW_YEAR", true);
-  SAVE_POWER        = prefs.getBool("SAVE_POWER", true);
+  SAVE_POWER        = prefs.getBool("SAVE_power", true);
   ALLOW_NO_MICROSD  = prefs.getBool("ALLOW_NO_SD", false);
   editingFile       = prefs.getString("editingFile", "");
   HOME_ON_BOOT      = prefs.getBool("HOME_ON_BOOT", false);
   OLED_BRIGHTNESS   = prefs.getInt("OLED_BRIGHTNESS", 255);
   OLED_MAX_FPS      = prefs.getInt("OLED_MAX_FPS", 30);
+  std::cout << "[LOAD_STATE] OLED_MAX_FPS loaded as: " << OLED_MAX_FPS << std::endl;
 
   // Update State (if needed)
   if (changeState) {
     u8g2.setContrast(OLED_BRIGHTNESS);
 
+{{ ... }}
     if (HOME_ON_BOOT) CurrentAppState = HOME;
     else CurrentAppState = static_cast<AppState>(prefs.getInt("CurrentAppState", HOME));
     

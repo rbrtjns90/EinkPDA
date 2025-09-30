@@ -83,6 +83,11 @@ static void initCanvases() {
       memset(gridCanvas, 0xFF, canvasSize);  // White background
       memset(frontCanvas, 0xFF, canvasSize);
       canvasInitialized = true;
+      std::cout << "[PERIODIC] Canvas memory allocated successfully (" << canvasSize << " bytes each)" << std::endl;
+    } else {
+      std::cerr << "[PERIODIC] ERROR: Failed to allocate canvas memory!" << std::endl;
+      if (gridCanvas) { free(gridCanvas); gridCanvas = nullptr; }
+      if (frontCanvas) { free(frontCanvas); frontCanvas = nullptr; }
     }
   }
 }
@@ -296,6 +301,10 @@ static void paint_table() {
 
 static void drawHighlight(Rect r) {
   // Invert the cell area for highlighting
+  if (!frontCanvas) {
+    std::cerr << "[PERIODIC] ERROR: frontCanvas is null in drawHighlight!" << std::endl;
+    return;
+  }
   int bytesPerRow = (SCREEN_W + 7) / 8;
   for (int y = 0; y < r.h; y++) {
     for (int x = 0; x < r.w; x++) {
@@ -536,6 +545,9 @@ static void update_oled() {
 
 void PERIODIC_INIT() {
   std::cout << "[POCKETMAGE] PERIODIC_INIT() starting..." << std::endl;
+  
+  // Initialize canvases for rendering
+  periodic::initCanvases();
   
   // Clear screen to remove any artifacts from previous apps
   display.fillScreen(GxEPD_WHITE);
